@@ -1,0 +1,6 @@
+{
+  "name": "EduPuntos - Tareas y Calificaciones",
+  "description": "Plataforma escolar para estudiantes y profesores con envío de tareas fotográficas, sincronización con Excel, notas oficiales y ranking de recompensas en tiempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
