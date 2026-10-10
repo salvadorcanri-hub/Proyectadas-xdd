@@ -1,3 +1,6 @@
+import { HomeworkPhoto } from '../components/HomeworkPhoto';
+import { AppNavigation } from '../components/AppNavigation';
+import { ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
 import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
@@ -94,7 +97,9 @@ export const StudentApp: React.FC<StudentAppProps> = ({
     }
   };
 
+  const assignmentPriority = (id: string) => state.grades.some(g => g.assignmentId === id && g.studentId === currentStudent?.id && g.grade) ? 2 : state.submissions.some(s => s.assignmentId === id && s.studentId === currentStudent?.id) ? 1 : 0;
   const filteredAssignments = state.assignments.filter((asg) => {
+    if (!currentStudent) return false;
     const submission = state.submissions.find(
       (s) => s.assignmentId === asg.id && s.studentId === currentStudent.id
     );
@@ -109,132 +114,44 @@ export const StudentApp: React.FC<StudentAppProps> = ({
     if (filter === 'submitted') return isSubmitted && !isGraded;
     if (filter === 'pending') return !isSubmitted && !isGraded;
     return true;
-  });
+  }).sort((a, b) => assignmentPriority(a.id) - assignmentPriority(b.id));
 
   if (!currentStudent) return <main className="p-8">No hay un estudiante asociado a esta cuenta. <button onClick={onLogout}>Cerrar sesión</button></main>;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
-      {/* Dedicated Student Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-6 px-4 sm:px-6 py-3.5">
-          {/* Zone 1: Dedicated Student Brand */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-xs">
-              <BookOpen className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap block">
-                EduPuntos Alumnos
-              </span>
-              <span className="text-[10px] text-indigo-600 font-bold tracking-wide block">
-                PORTAL DEL ESTUDIANTE
-              </span>
-            </div>
-          </div>
-
-          {/* Zone 2: Navigation strictly for students */}
-          <nav className="flex items-center gap-1 overflow-x-auto py-1 scrollbar-none">
-            <button
-              onClick={() => setActiveTab('homeworks')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-colors ${
-                activeTab === 'homeworks'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Mis Deberes</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('ranking')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-colors ${
-                activeTab === 'ranking'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Trophy className="w-3.5 h-3.5" />
-              <span>Ranking & Premios</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('report')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-colors ${
-                activeTab === 'report'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <Award className="w-3.5 h-3.5" />
-              <span>Mi Libreta</span>
-            </button>
-          </nav>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-semibold">{currentStudent?.name}</span>
-            <button onClick={onLogout} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold">Cerrar sesión</button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Student Profile Card */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="flex items-center gap-4">
-            <Avatar
-              src={currentStudent.avatar}
-              alt={currentStudent.name}
-              className="w-14 h-14 rounded-full object-cover border-2 border-indigo-200 shadow-2xs"
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900">{currentStudent.name}</h1>
-                <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
-                  {currentStudent.code}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Fotografía tus cuadernos, acumula puntos oficiales y gana premios en el Top 3.
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Metrics */}
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl text-center min-w-[100px]">
-              <span className="text-[11px] text-indigo-700 font-semibold uppercase block">Mis Puntos</span>
-              <span className="text-2xl font-bold font-mono text-indigo-950 tabular-nums">
-                {myScore?.totalPoints || 0}
-              </span>
-            </div>
-
-            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-center min-w-[100px]">
-              <span className="text-[11px] text-amber-800 font-semibold uppercase block">Puesto Aula</span>
-              <span className="text-2xl font-bold font-mono text-amber-950 tabular-nums">
-                #{myScore?.rank || '-'}
-              </span>
-            </div>
-          </div>
-        </div>
-
+    <div className="student-app min-h-screen text-slate-900 flex flex-col">
+      <AppNavigation role="student" active={activeTab} onChange={tab => setActiveTab(tab as typeof activeTab)} onLogout={onLogout} name={currentStudent.name} items={[
+        {id:'homeworks',label:'Mis Deberes',icon:BookOpen},
+        {id:'report',label:'Mi Libreta',icon:Award},
+        {id:'ranking',label:'Ranking & Premios',icon:Trophy},
+      ]}/>
+      <main id="main-content" className="student-main">
+        <div className="page-topline"><span>Mi espacio <span>/</span> {{homeworks:'Mis deberes',report:'Mi libreta',ranking:'Ranking y premios'}[activeTab]}</span><span className="term-label"><Sparkles size={14}/> A tu ritmo, cada día</span></div>
+        <section className="student-welcome">
+          <div className="student-greeting"><span className="eyebrow">QUÉ BUENO TENERTE AQUÍ</span><h1>¡Hola, {currentStudent.name.split(' ')[0]}! <span className="greeting-star">✦</span></h1><p>Cada pequeño esfuerzo te lleva más lejos.<br/>¿Qué vas a aprender hoy?</p><button onClick={() => {setActiveTab('homeworks'); setFilter('pending'); document.getElementById('student-tasks')?.scrollIntoView({behavior:'smooth',block:'start'});}} className="primary-action">Ver mis pendientes <ArrowRight size={17}/></button></div>
+          <div className="student-journey" aria-label="Tu avance"><div className="journey-trophy"><Trophy size={38} strokeWidth={1.5}/><span>✦</span></div><div><span>TU ESFUERZO SUMA</span><strong>{myScore?.totalPoints || 0}<small> puntos</small></strong><p>{myScore?.totalPoints ? '¡Sigue construyendo tu camino!' : 'Tu próxima tarea es un buen comienzo.'}</p></div></div>
+        </section>
+        <section className="student-stats" aria-label="Resumen de mi progreso">
+          <div><span className="stat-icon peach"><Clock size={21}/></span><span><strong>{myScore?.gradesCount.unsubmitted || 0}</strong><small>Por entregar</small></span></div>
+          <div><span className="stat-icon violet"><Camera size={21}/></span><span><strong>{myScore?.gradesCount.awaitingReview || 0}</strong><small>En revisión</small></span></div>
+          <div><span className="stat-icon mint"><CheckCircle2 size={21}/></span><span><strong>{myScore?.assignmentsCompleted || 0}</strong><small>Calificadas</small></span></div>
+          <div><span className="stat-icon gold"><Trophy size={21}/></span><span><strong>#{myScore?.rank || '—'}</strong><small>Puesto en el aula</small></span></div>
+        </section>
         {/* TAB 1: MIS DEBERES (TAREAS Y SUBIDA DE FOTOS) */}
         {activeTab === 'homeworks' && (
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-5">
+          <div id="student-tasks" className="student-tasks space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">Mis Tareas Asignadas</h2>
+                <h2 className="text-lg font-bold text-slate-900">Un paso más en tu aprendizaje</h2>
                 <p className="text-xs text-slate-500">
-                  Toma fotos nítidas de tu cuaderno. Las notas se sincronizan directamente con el registro de Excel del profesor.
+                  Elige una tarea, da lo mejor de ti y comparte tu trabajo.
                 </p>
               </div>
 
               {/* Filter tabs */}
-              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start sm:self-auto">
+              <div className="task-filters flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start sm:self-auto">
                 <button
-                  onClick={() => setFilter('all')}
+                  aria-pressed={filter === 'all'} onClick={() => setFilter('all')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
                     filter === 'all'
                       ? 'bg-white text-slate-900 shadow-xs'
@@ -244,7 +161,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                   Todas ({state.assignments.length})
                 </button>
                 <button
-                  onClick={() => setFilter('pending')}
+                  aria-pressed={filter === 'pending'} onClick={() => setFilter('pending')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
                     filter === 'pending'
                       ? 'bg-white text-slate-900 shadow-xs'
@@ -254,7 +171,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                   Pendientes
                 </button>
                 <button
-                  onClick={() => setFilter('submitted')}
+                  aria-pressed={filter === 'submitted'} onClick={() => setFilter('submitted')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
                     filter === 'submitted'
                       ? 'bg-white text-slate-900 shadow-xs'
@@ -264,7 +181,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                   En Revisión
                 </button>
                 <button
-                  onClick={() => setFilter('graded')}
+                  aria-pressed={filter === 'graded'} onClick={() => setFilter('graded')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
                     filter === 'graded'
                       ? 'bg-white text-slate-900 shadow-xs'
@@ -277,7 +194,8 @@ export const StudentApp: React.FC<StudentAppProps> = ({
             </div>
 
             {/* Assignments Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="homework-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {!filteredAssignments.length && <div className="task-empty"><CheckCircle2 size={32}/><h3>{filter === 'pending' ? '¡Todo al día!' : 'Todavía no hay tareas aquí'}</h3><p>{filter === 'pending' ? 'No tienes tareas pendientes. Puedes revisar tu libreta mientras llega un nuevo reto.' : 'Las tareas aparecerán en esta sección cuando cambie su estado.'}</p><button onClick={() => setFilter('all')} className="text-action">Ver todas las tareas <ArrowRight size={16}/></button></div>}
               {filteredAssignments.map((asg) => {
                 const submission = state.submissions.find(
                   (s) => s.assignmentId === asg.id && s.studentId === currentStudent.id
@@ -292,7 +210,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                 return (
                   <div
                     key={asg.id}
-                    className="flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 transition-colors"
+                    className={`homework-card flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden ${hasGrade ? 'is-graded' : hasSubmission ? 'is-submitted' : 'is-pending'}`}
                   >
                     <div className="p-4 border-b border-slate-100 flex items-start justify-between gap-3">
                       <div>
@@ -304,7 +222,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                         </h3>
                         <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                           <Clock className="w-3 h-3 text-slate-400" />
-                          <span>Entrega: {asg.dueDate}</span>
+                          <span>Entrega: {new Date(`${asg.dueDate}T12:00:00`).toLocaleDateString('es-PE', {day:'numeric',month:'long'})}</span>
                         </p>
                       </div>
 
@@ -337,7 +255,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                             Foto de tu cuaderno entregada:
                           </div>
                           <div className="relative group rounded-lg overflow-hidden border border-slate-200 bg-slate-900 h-36">
-                            <img
+                            <HomeworkPhoto
                               src={submission.photoUrl}
                               alt="Foto enviada"
                               referrerPolicy="no-referrer"
@@ -373,11 +291,11 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                         </div>
                       )}
 
-                      {!hasSubmission && (
+                      {!hasSubmission && !hasGrade && (
                         <div className="p-2.5 bg-amber-50/50 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-start gap-1.5">
                           <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                           <span>
-                            No saldrá tu nota hasta que envíes la foto y el profesor la revise.
+                            Sube una foto clara de tu trabajo para que tu profesor pueda revisarlo.
                           </span>
                         </div>
                       )}

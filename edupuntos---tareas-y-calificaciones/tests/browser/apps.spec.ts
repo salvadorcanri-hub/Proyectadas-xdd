@@ -24,8 +24,8 @@ test('independent apps: student submits, teacher grades, both receive live updat
     await expect(page.getByRole('button',{name:'Cerrar sesión'})).toBeVisible();
   }
   // Cookies use separate paths, so both identities coexist even in one browser context.
-  await teacher.reload(); await expect(teacher.getByRole('button',{name:'Conectar Excel'})).toBeVisible();
-  await expect(student.getByRole('button',{name:'Conectar Excel'})).toHaveCount(0);
+  await teacher.reload(); await expect(teacher.getByRole('button',{name:'Conectar Excel',exact:true})).toBeVisible();
+  await expect(student.getByRole('button',{name:'Conectar Excel',exact:true})).toHaveCount(0);
   await expect(student.getByTitle('Cambiar de estudiante')).toHaveCount(0);
   await expect(student.getByRole('button',{name:/App Docente/})).toHaveCount(0);
   await expect(student.locator('header')).toHaveCSS('position', 'sticky');
