@@ -1,29 +1,38 @@
 {
-  "name": "react-example",
+  "name": "edupuntos",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "build": "vite build",
+    "dev": "node scripts/dev.mjs",
+    "dev:api": "tsx server.ts",
+    "dev:teacher": "vite --mode teacher",
+    "dev:student": "vite --mode student",
+    "build": "npm run build:teacher && npm run build:student",
+    "build:teacher": "vite build --mode teacher",
+    "build:student": "vite build --mode student",
     "start": "tsx server.ts",
-    "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "start:teacher": "tsx scripts/serve-app.ts teacher",
+    "start:student": "tsx scripts/serve-app.ts student",
+    "user:create": "tsx scripts/create-user.ts",
+    "lint": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:browser": "playwright test",
+    "build:hosted": "node scripts/hosted.mjs build",
+    "start:hosted": "node scripts/hosted.mjs start",
+    "test:hosted": "npm run build:hosted && SERVE_HOSTED=1 playwright test"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "canvas-confetti": "^1.9.4",
-    "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",
-    "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "vite": "^8.3.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "http-proxy-middleware": "^3.0.5"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",
@@ -35,6 +44,11 @@
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2"
-  }
+    "typescript": "^7.0.2",
+    "@playwright/test": "^1.58.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "packageManager": "bun@1.4.2"
 }

@@ -64,6 +64,7 @@ export interface StudentScore {
     B: number;
     C: number;
     unsubmitted: number;
+    awaitingReview: number;
   };
   rank: number;
 }
@@ -74,4 +75,12 @@ export interface AppState {
   submissions: Submission[];
   grades: GradeRecord[];
   rewards: RewardsConfig;
+  ranking?: StudentScore[];
+}
+
+export interface User {
+  id: string;
+  username: string;
+  role: 'teacher' | 'student';
+  studentId: string | null;
 }

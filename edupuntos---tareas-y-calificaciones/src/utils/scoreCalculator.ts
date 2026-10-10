@@ -1,6 +1,7 @@
 import { AppState, GRADE_POINTS, StudentScore } from '../types';
 
 export function calculateStudentScores(state: AppState): StudentScore[] {
+  if (state.ranking) return state.ranking;
   const { students, assignments, grades } = state;
 
   const scores: StudentScore[] = students.map((student) => {
@@ -12,6 +13,7 @@ export function calculateStudentScores(state: AppState): StudentScore[] {
       B: 0,
       C: 0,
       unsubmitted: 0,
+      awaitingReview: 0,
     };
 
     assignments.forEach((asg) => {
@@ -24,6 +26,8 @@ export function calculateStudentScores(state: AppState): StudentScore[] {
         totalPoints += pts;
         gradesCount[record.grade]++;
         completedCount++;
+      } else if (state.submissions.some(s => s.studentId === student.id && s.assignmentId === asg.id)) {
+        gradesCount.awaitingReview++;
       } else {
         gradesCount.unsubmitted++;
       }
@@ -47,7 +51,7 @@ export function calculateStudentScores(state: AppState): StudentScore[] {
     if (b.assignmentsCompleted !== a.assignmentsCompleted) {
       return b.assignmentsCompleted - a.assignmentsCompleted;
     }
-    return a.student.name.localeCompare(b.student.name);
+    return a.student.name.localeCompare(b.student.name, 'es') || a.student.id.localeCompare(b.student.id, 'es');
   });
 
   // Assign ranks

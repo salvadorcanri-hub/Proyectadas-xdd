@@ -1,0 +1,23 @@
+# Despliegue propuesto: Render cobra por el plan Starter y el disco persistente.
+# Este archivo no crea servicios ni acepta cargos hasta que lo revises en Render.
+services:
+  - type: web
+    name: edupuntos
+    runtime: node
+    plan: starter
+    rootDir: edupuntos---tareas-y-calificaciones
+    buildCommand: npm install --prefix /tmp/edupuntos-bun --no-package-lock --no-audit --no-fund bun@1.4.2 && NODE_ENV=development /tmp/edupuntos-bun/node_modules/.bin/bun install --frozen-lockfile && npm run lint && npm test && npm run build:hosted
+    startCommand: npm run start:hosted
+    healthCheckPath: /api/health
+    numInstances: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data/edupuntos
+    disk:
+      name: edupuntos-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -1,0 +1,16 @@
+import express from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
+const role = process.argv[2];
+if (!['teacher','student'].includes(role)) throw new Error('Indica teacher o student.');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', role);
+if (!existsSync(path.join(root, 'index.html'))) throw new Error(`Compila primero: npm run build:${role}`);
+const app = express();
+app.disable('x-powered-by');
+app.use(createProxyMiddleware({ pathFilter: '/api', target: process.env.API_TARGET || 'http://127.0.0.1:3000', changeOrigin: true }));
+app.use(express.static(root));
+app.get('*', (_req, res) => res.sendFile(path.join(root, 'index.html')));
+const server = app.listen(Number(process.env.APP_PORT || (role === 'teacher' ? 3001 : 3002)), process.env.APP_HOST || '127.0.0.1', () => console.log(`EduPuntos ${role}: aplicación iniciada`));
+for (const signal of ['SIGINT','SIGTERM'] as const) process.on(signal, () => { server.close(); server.closeAllConnections(); });

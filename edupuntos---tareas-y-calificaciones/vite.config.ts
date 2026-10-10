@@ -1,22 +1,22 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
-import {defineConfig} from 'vite';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { defineConfig } from 'vite';
 
-export default defineConfig(() => {
+const root = path.dirname(fileURLToPath(import.meta.url));
+export default defineConfig(({ mode }) => {
+  if (mode !== 'teacher' && mode !== 'student') throw new Error('Usa npm run dev:teacher o npm run dev:student.');
   return {
+    root: path.join(root, 'apps', mode),
+    base: process.env.HOSTED_WEB === '1' ? (mode === 'teacher' ? '/docentes/' : '/alumnos/') : '/',
     plugins: [react(), tailwindcss()],
-    resolve: {
-      alias: {
-        '@': path.resolve(__dirname, '.'),
-      },
-    },
+    define: { __APP_ROLE__: JSON.stringify(mode) },
+    build: { outDir: path.join(root, 'dist', ...(process.env.HOSTED_WEB === '1' ? ['hosted'] : []), mode), emptyOutDir: true },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      host: '127.0.0.1', port: Number(mode === 'teacher' ? process.env.TEACHER_PORT || 3001 : process.env.STUDENT_PORT || 3002), strictPort: true,
+      fs: { allow: [root], deny: ['**/.git/**', '**/data/**', '**/*.sqlite*', '**/.env*', '**/*.{crt,pem}'] },
+      proxy: { '/api': { target: process.env.API_TARGET || 'http://127.0.0.1:3000' } },
     },
   };
 });

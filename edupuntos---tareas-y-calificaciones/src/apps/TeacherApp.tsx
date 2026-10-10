@@ -1,29 +1,20 @@
-import React, { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+import React, { useState, useRef, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
   FileSpreadsheet,
   Upload,
   Download,
   CheckCircle2,
-  AlertCircle,
   Plus,
   Trash2,
   Eye,
   Camera,
   Award,
-  BookOpen,
   Save,
-  Clock,
-  ExternalLink,
-  RefreshCw,
   Trophy,
   Medal,
-  Sparkles,
-  ArrowRight,
-  UserCheck,
 } from 'lucide-react';
-import { AppState, Assignment, GradeType, RewardsConfig } from '../types';
+import { AppState, GradeType, RewardsConfig } from '../types';
 import { calculateStudentScores, getGradeLabel } from '../utils/scoreCalculator';
 import {
   updateGrade,
@@ -31,20 +22,20 @@ import {
   deleteAssignment,
   importExcelBase64,
   updateRewardsConfig,
-  resetDemoData,
+  API_BASE,
 } from '../services/api';
 import { PhotoLightbox } from '../components/PhotoLightbox';
 
 interface TeacherAppProps {
   state: AppState;
   onStateUpdate: (newState: AppState) => void;
-  onOpenStudentApp: () => void;
+  onLogout: () => void;
 }
 
 export const TeacherApp: React.FC<TeacherAppProps> = ({
   state,
   onStateUpdate,
-  onOpenStudentApp,
+  onLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<'excel' | 'matrix' | 'reviews' | 'ranking' | 'assignments' | 'rewards'>('excel');
 
@@ -80,8 +71,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
   const [isSavingRewards, setIsSavingRewards] = useState(false);
   const [rewardsSavedMsg, setRewardsSavedMsg] = useState(false);
 
-  // Demo reset
-  const [isResetting, setIsResetting] = useState(false);
+  useEffect(() => { setRewardsForm({ ...state.rewards }); }, [state.rewards]);
 
   // Grade update
   const handleSetGrade = async (
@@ -102,22 +92,24 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
 
   // Excel Download handler
   const handleDownloadExcel = () => {
-    window.location.href = '/api/excel-export';
+    window.location.href = `${API_BASE}/excel-export`;
   };
 
   // Excel File selection & parsing
   const handleExcelFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+    setExcelBase64Data(''); setExcelPreviewRows(null);
+    if (file.size > 5 * 1024 * 1024) { setExcelMessage({ text: 'El archivo debe pesar como máximo 5 MB.', type: 'error' }); return; }
     setExcelMessage(null);
     setExcelLoading(true);
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const XLSX = await import('xlsx');
+        const workbook = XLSX.read(data, { type: 'array', sheetRows: 10002 });
         const firstSheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[firstSheetName];
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
@@ -143,6 +135,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
         setExcelLoading(false);
       }
     };
+    reader.onerror = () => { setExcelLoading(false); setExcelMessage({ text: 'No se pudo leer el archivo.', type: 'error' }); };
     reader.readAsArrayBuffer(file);
   };
 
@@ -224,17 +217,9 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
     }
   };
 
-  const handleReset = async () => {
-    if (!window.confirm('¿Restablecer datos escolares de demostración?')) return;
-    setIsResetting(true);
-    try {
-      const reset = await resetDemoData();
-      onStateUpdate(reset);
-    } finally {
-      setIsResetting(false);
-    }
-  };
-
+  useEffect(() => {
+    if (!state.assignments.some(a => a.id === selectedReviewAsgId)) setSelectedReviewAsgId(state.assignments[0]?.id || '');
+  }, [state.assignments, selectedReviewAsgId]);
   const scores = calculateStudentScores(state);
   const currentReviewAsg = state.assignments.find((a) => a.id === selectedReviewAsgId) || state.assignments[0];
 
@@ -333,28 +318,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
             </button>
           </nav>
 
-          {/* Zone 3: Switch to Student App & Reset */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={handleReset}
-              disabled={isResetting}
-              title="Restablecer datos de prueba"
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin' : ''}`} />
-            </button>
-
-            {/* Direct Switch to Student App */}
-            <button
-              onClick={onOpenStudentApp}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-slate-900 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors whitespace-nowrap shadow-xs"
-              title="Ver cómo lo ve el estudiante"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Abrir App Estudiantes</span>
-              <ArrowRight className="w-3 h-3 ml-0.5" />
-            </button>
-          </div>
+          <button onClick={onLogout} className="shrink-0 rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Cerrar sesión</button>
         </div>
       </header>
 
@@ -429,7 +393,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                   </div>
                   <h3 className="text-base font-bold text-white">Subir Archivo Excel con las Notas</h3>
                   <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                    Sube tu Excel con las notas anotadas (AD, A, B, C o números 10, 8, 6, 4). Los alumnos sin nota o sin presentar quedarán en 0 puntos y no se les mostrará nota.
+                    Sube tu Excel con las notas anotadas (AD, A, B, C o números 10, 8, 6, 4). Las celdas vacías conservan las notas actuales. Escribe BORRAR para quitar una nota. Si hay errores, no se aplica ningún cambio.
                   </p>
                 </div>
                 <div className="mt-4">
@@ -507,7 +471,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                 </div>
                 <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-lg">
                   <span className="font-bold text-slate-400 block">Vacío (0 puntos)</span>
-                  <span className="text-[11px] text-slate-500">Sin nota / Sin presentar</span>
+                  <span className="text-[11px] text-slate-500">Sin calificar</span>
                 </div>
               </div>
             </div>
@@ -586,6 +550,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                             <td key={asg.id} className="px-2 py-2 text-center">
                               <div className="inline-flex flex-col items-center">
                                 <select
+                                  aria-label={`Nota de ${student.name} en ${asg.title}`}
                                   value={currentGrade || ''}
                                   onChange={(e) =>
                                     handleSetGrade(
@@ -847,7 +812,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                             handleSetGrade(
                               selectedReviewAsgId,
                               student.id,
-                              currentGrade || 'AD',
+                              currentGrade || null,
                               feedbackInputs[inputKey]
                             )
                           }
@@ -878,7 +843,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
-              {scores[1] && (
+              {scores[1] && scores[1].totalPoints > 0 && (
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 flex flex-col justify-between order-2 md:order-1">
                   <div>
                     <div className="flex items-center justify-between mb-3 text-xs font-semibold text-slate-300">
@@ -907,7 +872,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                 </div>
               )}
 
-              {scores[0] && (
+              {scores[0] && scores[0].totalPoints > 0 && (
                 <div className="bg-slate-950 border-2 border-amber-400/80 rounded-xl p-6 flex flex-col justify-between order-1 md:order-2 shadow-lg">
                   <div>
                     <div className="flex items-center justify-between mb-3 text-xs font-bold text-amber-400">
@@ -936,7 +901,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                 </div>
               )}
 
-              {scores[2] && (
+              {scores[2] && scores[2].totalPoints > 0 && (
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 flex flex-col justify-between order-3">
                   <div>
                     <div className="flex items-center justify-between mb-3 text-xs font-semibold text-amber-500">

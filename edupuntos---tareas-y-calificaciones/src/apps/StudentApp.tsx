@@ -2,21 +2,15 @@ import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Camera,
-  Upload,
   Trophy,
-  CheckCircle2,
   Clock,
   AlertCircle,
   ExternalLink,
   BookOpen,
-  LogOut,
-  Sparkles,
   Medal,
   Award,
-  FileText,
-  FileSpreadsheet,
 } from 'lucide-react';
-import { AppState, Assignment, Student } from '../types';
+import { AppState, Assignment } from '../types';
 import { calculateStudentScores, getGradeLabel } from '../utils/scoreCalculator';
 import { submitHomework } from '../services/api';
 import { PhotoLightbox } from '../components/PhotoLightbox';
@@ -24,32 +18,15 @@ import { PhotoLightbox } from '../components/PhotoLightbox';
 interface StudentAppProps {
   state: AppState;
   activeStudentId: string;
-  onSelectStudent: (studentId: string) => void;
   onStateUpdate: (newState: AppState) => void;
-  onOpenTeacherApp: () => void;
+  onLogout: () => void;
 }
-
-const SAMPLE_HOMEWORK_PHOTOS = [
-  {
-    name: 'Ejercicios de Cuaderno (Matemáticas)',
-    url: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=900&auto=format&fit=crop&q=80',
-  },
-  {
-    name: 'Apuntes y Esquema (Ciencias)',
-    url: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=900&auto=format&fit=crop&q=80',
-  },
-  {
-    name: 'Texto y Ensayo Manuscrito',
-    url: 'https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=900&auto=format&fit=crop&q=80',
-  },
-];
 
 export const StudentApp: React.FC<StudentAppProps> = ({
   state,
   activeStudentId,
-  onSelectStudent,
   onStateUpdate,
-  onOpenTeacherApp,
+  onLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<'homeworks' | 'ranking' | 'report'>('homeworks');
   const currentStudent = state.students.find((s) => s.id === activeStudentId) || state.students[0];
@@ -73,8 +50,8 @@ export const StudentApp: React.FC<StudentAppProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setUploadError('Por favor selecciona una imagen válida (JPG, PNG, WEBP).');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setUploadError('Selecciona una imagen JPG, PNG o WebP de hasta 5 MB.');
       return;
     }
 
@@ -83,12 +60,8 @@ export const StudentApp: React.FC<StudentAppProps> = ({
     reader.onload = () => {
       setPhotoPreview(reader.result as string);
     };
+    reader.onerror = () => setUploadError('No se pudo leer la imagen.');
     reader.readAsDataURL(file);
-  };
-
-  const handleSelectSamplePhoto = (url: string) => {
-    setPhotoPreview(url);
-    setUploadError('');
   };
 
   const handleSubmitPhoto = async () => {
@@ -133,12 +106,11 @@ export const StudentApp: React.FC<StudentAppProps> = ({
 
     if (filter === 'graded') return isGraded;
     if (filter === 'submitted') return isSubmitted && !isGraded;
-    if (filter === 'pending') return !isSubmitted;
+    if (filter === 'pending') return !isSubmitted && !isGraded;
     return true;
   });
 
-  const isTop3 = myScore && myScore.rank <= 3;
-  const rank3 = scores[2];
+  if (!currentStudent) return <main className="p-8">No hay un estudiante asociado a esta cuenta. <button onClick={onLogout}>Cerrar sesión</button></main>;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
@@ -199,30 +171,9 @@ export const StudentApp: React.FC<StudentAppProps> = ({
             </button>
           </nav>
 
-          {/* Zone 3: Student Switcher & Exit to Hub */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Student Persona Select */}
-            <select
-              value={currentStudent.id}
-              onChange={(e) => onSelectStudent(e.target.value)}
-              className="text-xs font-semibold text-slate-800 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-hidden"
-              title="Cambiar de estudiante"
-            >
-              {state.students.map((st) => (
-                <option key={st.id} value={st.id}>
-                  {st.name.split(' ')[0]} ({st.code})
-                </option>
-              ))}
-            </select>
-
-            <button
-              onClick={onOpenTeacherApp}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:text-emerald-950 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors whitespace-nowrap"
-              title="Volver a la App del Docente"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Ir a App Docente</span>
-            </button>
+            <span className="text-xs font-semibold">{currentStudent?.name}</span>
+            <button onClick={onLogout} className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold">Cerrar sesión</button>
           </div>
         </div>
       </header>
@@ -435,7 +386,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                       <button
                         onClick={() => {
                           setUploadModalAsg(asg);
-                          setPhotoPreview(submission?.photoUrl || '');
+                          setPhotoPreview('');
                           setStudentComment(submission?.comment || '');
                           setUploadError('');
                         }}
@@ -462,7 +413,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
             {/* Top 3 Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
               {/* 2nd place */}
-              {scores[1] && (
+              {scores[1] && scores[1].totalPoints > 0 && (
                 <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col justify-between order-2 md:order-1">
                   <div>
                     <div className="flex items-center justify-between mb-3 text-xs font-semibold text-slate-700">
@@ -496,7 +447,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
               )}
 
               {/* 1st place */}
-              {scores[0] && (
+              {scores[0] && scores[0].totalPoints > 0 && (
                 <div className="bg-white border-2 border-amber-300 rounded-xl p-6 shadow-md flex flex-col justify-between order-1 md:order-2 bg-linear-to-b from-amber-50/40 to-white">
                   <div>
                     <div className="flex items-center justify-between mb-3 text-xs font-bold text-amber-800">
@@ -532,7 +483,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
               )}
 
               {/* 3rd place */}
-              {scores[2] && (
+              {scores[2] && scores[2].totalPoints > 0 && (
                 <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col justify-between order-3">
                   <div>
                     <div className="flex items-center justify-between mb-3 text-xs font-semibold text-amber-800">
@@ -607,7 +558,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                           <td className="px-4 py-3 text-center font-mono text-rose-700">{sc.gradesCount.C}</td>
                           <td className="px-4 py-3 text-right font-bold font-mono text-slate-900">{sc.totalPoints} pts</td>
                           <td className="px-4 py-3 text-[11px]">
-                            {sc.rank === 1 ? '🥇 Oro' : sc.rank === 2 ? '🥈 Plata' : sc.rank === 3 ? '🥉 Bronce' : '-'}
+                            {sc.totalPoints === 0 ? '-' : sc.rank === 1 ? '🥇 Oro' : sc.rank === 2 ? '🥈 Plata' : sc.rank === 3 ? '🥉 Bronce' : '-'}
                           </td>
                         </tr>
                       );
@@ -702,37 +653,13 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                 </span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp"
                   capture="environment"
                   onChange={handleFileChange}
                   className="hidden"
                 />
               </label>
 
-              {/* Sample Photo selector */}
-              <div>
-                <div className="text-[11px] font-semibold text-slate-500 mb-1.5">
-                  ¿Probando en PC? Fotos de muestra:
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {SAMPLE_HOMEWORK_PHOTOS.map((sample, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleSelectSamplePhoto(sample.url)}
-                      className="text-left p-1 border border-slate-200 hover:border-indigo-400 rounded-lg text-[10px]"
-                    >
-                      <img
-                        src={sample.url}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        className="w-full h-12 object-cover rounded mb-1"
-                      />
-                      <span className="line-clamp-1">{sample.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               {photoPreview && (
                 <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-900 max-h-52">

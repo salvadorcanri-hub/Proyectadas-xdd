@@ -1,134 +1,43 @@
 import { AppState, GradeType, RewardsConfig } from '../types';
 
-export async function fetchState(): Promise<AppState> {
-  const res = await fetch('/api/state');
-  if (!res.ok) throw new Error('Error al cargar datos del servidor');
-  const data = await res.json();
-  return data.state;
-}
-
-export async function submitHomework(
-  assignmentId: string,
-  studentId: string,
-  photoUrl: string,
-  comment?: string
-): Promise<AppState> {
-  const res = await fetch('/api/submissions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ assignmentId, studentId, photoUrl, comment }),
-  });
+export const API_BASE = `/api/${__APP_ROLE__}`;
+export async function request(endpoint: string, options: RequestInit = {}) {
+  const res = await fetch(API_BASE + endpoint, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-EduPuntos-Client': __APP_ROLE__, ...options.headers } });
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Error al enviar tarea');
+    if (res.status === 401 && !endpoint.startsWith('/auth/')) window.dispatchEvent(new Event('session-expired'));
+    throw Object.assign(new Error(data.error || 'No se pudo completar la operación.'), { status: res.status });
   }
-  const data = await res.json();
-  return data.state;
+  return data;
 }
 
-export async function updateGrade(
-  assignmentId: string,
-  studentId: string,
-  grade: GradeType,
-  feedback?: string
-): Promise<AppState> {
-  const res = await fetch('/api/grades', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ assignmentId, studentId, grade, feedback }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Error al guardar calificación');
-  }
-  const data = await res.json();
-  return data.state;
+export async function fetchState(): Promise<AppState> { return (await request('/state')).state; }
+export async function submitHomework(assignmentId: string, studentId: string, photoUrl: string, comment?: string): Promise<AppState> {
+  return (await request('/submissions', { method: 'POST', body: JSON.stringify({ assignmentId, studentId, photoUrl, comment }) })).state;
 }
-
-export async function createAssignment(
-  title: string,
-  subject: string,
-  dueDate: string,
-  description: string
-): Promise<AppState> {
-  const res = await fetch('/api/assignments', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, subject, dueDate, description }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Error al crear tarea');
-  }
-  const data = await res.json();
-  return data.state;
+export async function updateGrade(assignmentId: string, studentId: string, grade: GradeType, feedback?: string): Promise<AppState> {
+  return (await request('/grades', { method: 'POST', body: JSON.stringify({ assignmentId, studentId, grade, feedback }) })).state;
 }
-
+export async function createAssignment(title: string, subject: string, dueDate: string, description: string): Promise<AppState> {
+  return (await request('/assignments', { method: 'POST', body: JSON.stringify({ title, subject, dueDate, description }) })).state;
+}
 export async function deleteAssignment(id: string): Promise<AppState> {
-  const res = await fetch(`/api/assignments/${id}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Error al eliminar tarea');
-  }
-  const data = await res.json();
-  return data.state;
+  return (await request(`/assignments/${encodeURIComponent(id)}`, { method: 'DELETE', body: '{}' })).state;
 }
-
 export async function importExcelBase64(fileBase64: string): Promise<{ state: AppState; message: string; updatedCount: number }> {
-  const res = await fetch('/api/excel-import', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fileBase64 }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'Error al procesar el archivo Excel');
-  }
-  const data = await res.json();
-  return {
-    state: data.state,
-    message: data.message,
-    updatedCount: data.updatedGradesCount,
-  };
+  const data = await request('/excel-import', { method: 'POST', body: JSON.stringify({ fileBase64 }) });
+  return { state: data.state, message: data.message, updatedCount: data.updatedGradesCount };
 }
-
 export async function updateRewardsConfig(rewards: RewardsConfig): Promise<AppState> {
-  const res = await fetch('/api/rewards', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(rewards),
-  });
-  if (!res.ok) throw new Error('Error al actualizar premios');
-  return fetchState();
+  return (await request('/rewards', { method: 'POST', body: JSON.stringify(rewards) })).state;
 }
-
-export async function resetDemoData(): Promise<AppState> {
-  const res = await fetch('/api/reset', { method: 'POST' });
-  const data = await res.json();
-  return data.state;
-}
-
 export function subscribeToRealtimeUpdates(onUpdate: (state: AppState) => void): () => void {
-  const eventSource = new EventSource('/api/events');
-
-  eventSource.onmessage = (event) => {
-    try {
-      const payload = JSON.parse(event.data);
-      if (payload && payload.state) {
-        onUpdate(payload.state);
-      }
-    } catch (err) {
-      console.error('Error parsing SSE event:', err);
-    }
+  const events = new EventSource(API_BASE + '/events');
+  let stopped = false;
+  events.onmessage = event => { const payload = JSON.parse(event.data); if (payload.state) onUpdate(payload.state); };
+  events.onerror = () => {
+    // EventSource reconnects itself; check whether authentication has expired.
+    void request('/state').then(data => { if (!stopped) onUpdate(data.state); }).catch(() => {});
   };
-
-  eventSource.onerror = () => {
-    // Attempt recovery or ignore transient disconnects
-  };
-
-  return () => {
-    eventSource.close();
-  };
+  return () => { stopped = true; events.close(); };
 }
