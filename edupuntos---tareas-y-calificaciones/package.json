@@ -20,21 +20,29 @@
     "test:browser": "playwright test",
     "build:hosted": "node scripts/hosted.mjs build",
     "start:hosted": "node scripts/hosted.mjs start",
-    "test:hosted": "npm run build:hosted && SERVE_HOSTED=1 playwright test"
+    "test:hosted": "npm run build:hosted && SERVE_HOSTED=1 playwright test",
+    "build:netlify": "node scripts/build-netlify.mjs",
+    "dev:supabase:teacher": "EDUPUNTOS_BACKEND=supabase vite --mode teacher",
+    "dev:supabase:student": "EDUPUNTOS_BACKEND=supabase vite --mode student",
+    "test:supabase": "node --import tsx --test tests/supabase.test.ts",
+    "test:netlify": "node scripts/test-netlify.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "canvas-confetti": "^1.9.4",
     "express": "^4.21.2",
+    "http-proxy-middleware": "^3.0.5",
     "lucide-react": "^0.546.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "vite": "^8.3.0",
-    "xlsx": "^0.18.5",
-    "http-proxy-middleware": "^3.0.5"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.58.2",
     "@types/canvas-confetti": "^1.9.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
@@ -44,8 +52,7 @@
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2",
-    "@playwright/test": "^1.58.2"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=24.0.0"

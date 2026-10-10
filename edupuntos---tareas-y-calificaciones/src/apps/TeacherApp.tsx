@@ -1,3 +1,4 @@
+import { Avatar } from '../components/Avatar';
 import React, { useState, useRef, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
@@ -22,7 +23,7 @@ import {
   deleteAssignment,
   importExcelBase64,
   updateRewardsConfig,
-  API_BASE,
+  downloadExcel,
 } from '../services/api';
 import { PhotoLightbox } from '../components/PhotoLightbox';
 
@@ -91,8 +92,9 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
   };
 
   // Excel Download handler
-  const handleDownloadExcel = () => {
-    window.location.href = `${API_BASE}/excel-export`;
+  const handleDownloadExcel = async () => {
+    try { await downloadExcel(); }
+    catch (error) { setExcelMessage({ text: (error as Error).message, type: 'error' }); }
   };
 
   // Excel File selection & parsing
@@ -527,7 +529,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <img
+                            <Avatar
                               src={student.avatar}
                               alt={student.name}
                               className="w-7 h-7 rounded-full object-cover border border-slate-700"
@@ -677,7 +679,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <img
+                          <Avatar
                             src={student.avatar}
                             alt={student.name}
                             className="w-10 h-10 rounded-full object-cover border border-slate-700"
@@ -854,7 +856,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                       <span className="font-mono">#2</span>
                     </div>
                     <div className="flex items-center gap-3 mb-3">
-                      <img src={scores[1].student.avatar} alt="" className="w-12 h-12 rounded-full object-cover border border-slate-700" />
+                      <Avatar src={scores[1].student.avatar} alt={scores[1].student.name} className="w-12 h-12 rounded-full object-cover border border-slate-700" />
                       <div>
                         <h4 className="font-bold text-white">{scores[1].student.name}</h4>
                         <span className="text-xs text-slate-500">{scores[1].student.code}</span>
@@ -883,7 +885,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                       <span className="bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded font-mono">LÍDER</span>
                     </div>
                     <div className="flex items-center gap-3.5 mb-3">
-                      <img src={scores[0].student.avatar} alt="" className="w-14 h-14 rounded-full object-cover border-2 border-amber-400" />
+                      <Avatar src={scores[0].student.avatar} alt={scores[0].student.name} className="w-14 h-14 rounded-full object-cover border-2 border-amber-400" />
                       <div>
                         <h4 className="text-base font-bold text-white">{scores[0].student.name}</h4>
                         <span className="text-xs text-slate-400">{scores[0].student.code}</span>
@@ -912,7 +914,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                       <span className="font-mono">#3</span>
                     </div>
                     <div className="flex items-center gap-3 mb-3">
-                      <img src={scores[2].student.avatar} alt="" className="w-12 h-12 rounded-full object-cover border border-slate-700" />
+                      <Avatar src={scores[2].student.avatar} alt={scores[2].student.name} className="w-12 h-12 rounded-full object-cover border border-slate-700" />
                       <div>
                         <h4 className="font-bold text-white">{scores[2].student.name}</h4>
                         <span className="text-xs text-slate-500">{scores[2].student.code}</span>

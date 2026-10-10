@@ -9,10 +9,12 @@ export default defineConfig(({ mode }) => {
   if (mode !== 'teacher' && mode !== 'student') throw new Error('Usa npm run dev:teacher o npm run dev:student.');
   return {
     root: path.join(root, 'apps', mode),
-    base: process.env.HOSTED_WEB === '1' ? (mode === 'teacher' ? '/docentes/' : '/alumnos/') : '/',
+    base: (process.env.HOSTED_WEB === '1' || process.env.EDUPUNTOS_BACKEND === 'supabase') ? (mode === 'teacher' ? '/docentes/' : '/alumnos/') : '/',
     plugins: [react(), tailwindcss()],
-    define: { __APP_ROLE__: JSON.stringify(mode) },
-    build: { outDir: path.join(root, 'dist', ...(process.env.HOSTED_WEB === '1' ? ['hosted'] : []), mode), emptyOutDir: true },
+    define: { __APP_ROLE__: JSON.stringify(mode), __BACKEND__: JSON.stringify(process.env.EDUPUNTOS_BACKEND === 'supabase' ? 'supabase' : 'local') },
+    envDir: root,
+    resolve: { alias: { '#backend': path.join(root, 'src/services', process.env.EDUPUNTOS_BACKEND === 'supabase' ? 'supabase-api.ts' : 'local-api.ts') } },
+    build: { outDir: path.join(root, 'dist', ...(process.env.EDUPUNTOS_BACKEND === 'supabase' ? ['netlify'] : process.env.HOSTED_WEB === '1' ? ['hosted'] : []), mode), emptyOutDir: true },
     server: {
       host: '127.0.0.1', port: Number(mode === 'teacher' ? process.env.TEACHER_PORT || 3001 : process.env.STUDENT_PORT || 3002), strictPort: true,
       fs: { allow: [root], deny: ['**/.git/**', '**/data/**', '**/*.sqlite*', '**/.env*', '**/*.{crt,pem}'] },

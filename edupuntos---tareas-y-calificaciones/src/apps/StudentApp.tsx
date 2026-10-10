@@ -1,3 +1,4 @@
+import { Avatar } from '../components/Avatar';
 import React, { useState } from 'react';
 import confetti from 'canvas-confetti';
 import {
@@ -183,7 +184,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
         {/* Student Profile Card */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="flex items-center gap-4">
-            <img
+            <Avatar
               src={currentStudent.avatar}
               alt={currentStudent.name}
               className="w-14 h-14 rounded-full object-cover border-2 border-indigo-200 shadow-2xs"
@@ -424,9 +425,9 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                       <span className="font-mono">#2</span>
                     </div>
                     <div className="flex items-center gap-3 mb-3">
-                      <img
+                      <Avatar
                         src={scores[1].student.avatar}
-                        alt=""
+                        alt={scores[1].student.name}
                         className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
                       />
                       <div>
@@ -458,9 +459,9 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                       <span className="bg-amber-100 px-2 py-0.5 rounded text-amber-800 font-mono">LÍDER</span>
                     </div>
                     <div className="flex items-center gap-3.5 mb-3">
-                      <img
+                      <Avatar
                         src={scores[0].student.avatar}
-                        alt=""
+                        alt={scores[0].student.name}
                         className="w-14 h-14 rounded-full object-cover border-2 border-amber-400"
                       />
                       <div>
@@ -494,9 +495,9 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                       <span className="font-mono">#3</span>
                     </div>
                     <div className="flex items-center gap-3 mb-3">
-                      <img
+                      <Avatar
                         src={scores[2].student.avatar}
-                        alt=""
+                        alt={scores[2].student.name}
                         className="w-12 h-12 rounded-full object-cover border-2 border-amber-200"
                       />
                       <div>
@@ -548,7 +549,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2.5">
-                              <img src={sc.student.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
+                              <Avatar src={sc.student.avatar} alt={sc.student.name} className="w-7 h-7 rounded-full object-cover" />
                               <span>{sc.student.name} {isMe ? '(Tú)' : ''}</span>
                             </div>
                           </td>

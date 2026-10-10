@@ -1,5 +1,7 @@
 # EduPuntos
 
+**Opción para empezar con planes gratuitos: [Netlify + Supabase](SUPABASE_NETLIFY.md).** Sigue esa guía para publicar las dos apps sin el servidor de Render. El resto de este documento describe el modo local Express/SQLite y la alternativa de Render.
+
 Dos aplicaciones web independientes conectadas a una API común:
 
 - **Docentes**: tareas, revisión de fotos, calificaciones, Excel y premios.
