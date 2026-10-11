@@ -30,6 +30,9 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
   const photoMigration = readFileSync(new URL('../supabase/migrations/002_photo_authorization.sql', import.meta.url), 'utf8');
   await db.exec(photoMigration);
   await db.exec(photoMigration);
+  const comparisonMigration = readFileSync(new URL('../supabase/migrations/003_photo_grade_comparison.sql', import.meta.url), 'utf8');
+  await db.exec(comparisonMigration);
+  await db.exec(comparisonMigration);
   await db.exec(readFileSync(new URL('../supabase/demo.sql', import.meta.url),'utf8'));
   for (const [id,email] of [[teacher,'teacher@test.invalid'],[student,'one@test.invalid'],[other,'two@test.invalid'],[outsider,'unassigned@test.invalid']]) {
     await db.query('insert into auth.users values($1,$2)',[id,email]);
@@ -111,10 +114,27 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
     assert.equal((await state()).ranking[0].student.id,'est-2');
     assert.equal((await state()).grades.find((g:any)=>g.studentId==='est-1').feedback,'Bien hecho');
   });
-  await t.test('resubmission clears the old grade; deleting a task removes dependent school records',async () => {
+  await t.test('photo readings are private, validated and never replace official grades', async () => {
+    await as(teacher); await db.query("select public.edu_set_grade('asg-1','est-1','B')");
+    await as(student);
+    const reading = {status:'read',grade:'AD',confidence:95};
+    await db.query("select public.edu_submit('asg-1',$1,'',$2::jsonb)",[`${student}/photo.png`,JSON.stringify(reading)]);
+    assert.deepEqual((await state()).submissions[0].photoReading,reading);
+    assert.equal((await state()).grades[0].grade,'B');
+    assert.equal((await state()).ranking.find((s:any)=>s.student.id==='est-1').totalPoints,6);
+    for (const invalid of [{...reading,confidence:20},{...reading,grade:'X'}, {}, {status:'uncertain',grade:'A',confidence:95}]) {
+      await assert.rejects(db.query("select public.edu_submit('asg-1',$1,'',$2::jsonb)",[`${student}/photo.png`,JSON.stringify(invalid)]),/check constraint/);
+    }
+    await as(other); assert.equal((await state()).submissions.length,0);
+    await as(teacher); assert.deepEqual((await state()).submissions[0].photoReading,reading);
+    await as('', 'anon');
+    await assert.rejects(db.query("select public.edu_submit('asg-1','x','','{}'::jsonb)"),/permission denied/);
+  });
+  await t.test('resubmission preserves the official grade; deleting a task removes dependent school records',async () => {
     await as(teacher); await db.query("select public.edu_set_grade('asg-1','est-1','A')");
     await as(student); await db.query("select public.edu_submit('asg-1',$1,'Segunda entrega')",[`${student}/photo.png`]);
-    assert.equal((await state()).grades.length,0);
+    assert.equal((await state()).grades[0].grade,'A');
+    assert.equal((await state()).submissions[0].photoReading,null);
     await as(teacher); await db.query("select public.edu_delete_assignment('asg-1')");
     assert.equal((await state()).submissions.length,0); assert.equal((await state()).grades.length,0);
     assert.equal((await state()).assignments.length,2);

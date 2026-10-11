@@ -1,4 +1,4 @@
-import { AppState, GradeType, RewardsConfig } from '../types';
+import { AppState, GradeType, RewardsConfig, PhotoReading } from '../types';
 
 export const API_BASE = `/api/${__APP_ROLE__}`;
 export async function request(endpoint: string, options: RequestInit = {}) {
@@ -17,8 +17,8 @@ export async function request(endpoint: string, options: RequestInit = {}) {
 }
 
 export async function fetchState(): Promise<AppState> { return (await request('/state')).state; }
-export async function submitHomework(assignmentId: string, studentId: string, photoUrl: string, comment?: string): Promise<AppState> {
-  return (await request('/submissions', { method: 'POST', body: JSON.stringify({ assignmentId, studentId, photoUrl, comment }) })).state;
+export async function submitHomework(assignmentId: string, studentId: string, photoUrl: string, comment?: string, photoReading?: PhotoReading | null): Promise<AppState> {
+  return (await request('/submissions', { method: 'POST', body: JSON.stringify({ assignmentId, studentId, photoUrl, comment, photoReading }) })).state;
 }
 export async function updateGrade(assignmentId: string, studentId: string, grade: GradeType, feedback?: string): Promise<AppState> {
   return (await request('/grades', { method: 'POST', body: JSON.stringify({ assignmentId, studentId, grade, feedback }) })).state;

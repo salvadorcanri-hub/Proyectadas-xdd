@@ -9,6 +9,7 @@ import { storePhoto, removeUnusedPhotos } from './photos';
 import { securityHeaders } from './security';
 import { calculateStudentScores } from '../src/utils/scoreCalculator';
 import type { AppState, User } from '../src/types';
+import { validatePhotoReading } from '../src/utils/photoVerification';
 
 class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 const text = (value: unknown, name: string, max: number, optional = false) => {
@@ -133,14 +134,16 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
     const assignmentId = text(req.body.assignmentId, 'Tarea', 100);
     if (!state.assignments.some(a => a.id === assignmentId)) throw new HttpError(404, 'La tarea no existe.');
     const comment = text(req.body.comment, 'Comentario', 2000, true);
+    let photoReading;
+    try { photoReading = validatePhotoReading(req.body.photoReading); }
+    catch { throw new HttpError(400, 'Lectura de foto inválida.'); }
     let photoUrl: string;
     try { photoUrl = storePhoto(store.dataDir, req.body.photoUrl); } catch (e) { throw new HttpError(400, (e as Error).message); }
     const existing = state.submissions.find(s => s.assignmentId === assignmentId && s.studentId === user.studentId);
-    const submission = { id: existing?.id || randomUUID(), assignmentId, studentId: user.studentId!, photoUrl, submittedAt: new Date().toISOString(), comment };
+    const submission = { id: existing?.id || randomUUID(), assignmentId, studentId: user.studentId!, photoUrl, submittedAt: new Date().toISOString(), comment, photoReading };
     const previousPhoto = existing?.photoUrl;
     if (existing) Object.assign(existing, submission); else state.submissions.push(submission);
-    // A replacement submission needs a new review; do not display the previous photo's grade as current.
-    state.grades = state.grades.filter(g => g.assignmentId !== assignmentId || g.studentId !== user.studentId);
+    // The teacher already graded this work at school. A photo never changes the official record.
     commit(state);
     removeUnusedPhotos(store.dataDir, previousPhoto ? [previousPhoto] : [], state.submissions);
     res.json({ success: true, state: project(user) });

@@ -73,6 +73,12 @@ test('connected apps enforce identity, sync changes, protect photos and persist 
   sheet[1][column] = 'B';
   assert.equal((await call('teacher','/excel-import',teacher,{fileBase64:(await workbookBuffer(sheet)).toString('base64')})).status,200);
   assert.equal(store.load().grades.find(g=>g.studentId==='est-1'&&g.assignmentId===assignment.id)!.grade,'B');
+  const officialGrades = structuredClone(store.load().grades);
+  const reading = { status: 'read', grade: 'AD', confidence: 95 };
+  assert.equal((await call('student','/submissions',student,{assignmentId:assignment.id,photoUrl:photo,photoReading:reading})).status,200);
+  assert.deepEqual(store.load().grades,officialGrades, 'A photo reading must never overwrite or delete official grades');
+  assert.deepEqual(store.load().submissions.find(s=>s.assignmentId===assignment.id)!.photoReading,reading);
+  assert.equal((await call('student','/submissions',student,{assignmentId:assignment.id,photoUrl:photo,photoReading:{...reading,confidence:20}})).status,400);
   const invalidGrade = await call('teacher','/grades',teacher,{assignmentId:assignment.id,studentId:'est-1',grade:'X'}); assert.equal(invalidGrade.status,400);
   assert.equal((await call('teacher','/assignments',teacher,{title:'Bad date',subject:'X',dueDate:'2026-02-31'})).status,400);
   await call('student','/auth/logout',student,{});

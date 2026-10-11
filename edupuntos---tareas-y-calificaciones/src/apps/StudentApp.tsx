@@ -14,11 +14,14 @@ import {
   Medal,
   Award,
 } from 'lucide-react';
-import { AppState, Assignment } from '../types';
+import { AppState, Assignment, PhotoReading } from '../types';
 import { calculateStudentScores, getGradeLabel } from '../utils/scoreCalculator';
 import { submitHomework } from '../services/api';
 import { PhotoLightbox } from '../components/PhotoLightbox';
 import { Modal } from '../components/Modal';
+import { PhotoGradeReader } from '../components/PhotoGradeReader';
+import { GradeVerification } from '../components/GradeVerification';
+import { verificationStatus } from '../utils/photoVerification';
 
 interface StudentAppProps {
   state: AppState;
@@ -44,6 +47,8 @@ export const StudentApp: React.FC<StudentAppProps> = ({
   const [studentComment, setStudentComment] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string>('');
+  const [photoReading, setPhotoReading] = useState<PhotoReading | null>(null);
+  const [isReading, setIsReading] = useState(false);
   const photoReader = useRef<FileReader | null>(null);
   useEffect(() => () => { photoReader.current?.abort(); photoReader.current = null; }, [uploadModalAsg?.id]);
 
@@ -59,6 +64,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
     photoReader.current?.abort();
     photoReader.current = null;
     setPhotoPreview('');
+    setPhotoReading(null); setIsReading(false);
 
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
       setUploadError('Selecciona una imagen JPG, PNG o WebP de hasta 5 MB.');
@@ -90,7 +96,8 @@ export const StudentApp: React.FC<StudentAppProps> = ({
         uploadModalAsg.id,
         currentStudent.id,
         photoPreview,
-        studentComment
+        studentComment,
+        photoReading
       );
       onStateUpdate(updatedState);
       confetti({ particleCount: 60, spread: 70 });
@@ -104,22 +111,17 @@ export const StudentApp: React.FC<StudentAppProps> = ({
     }
   };
 
-  const assignmentPriority = (id: string) => state.grades.some(g => g.assignmentId === id && g.studentId === currentStudent?.id && g.grade) ? 2 : state.submissions.some(s => s.assignmentId === id && s.studentId === currentStudent?.id) ? 1 : 0;
+  const statusFor = (id: string) => verificationStatus(state.submissions.find(s => s.assignmentId === id && s.studentId === currentStudent?.id), state.grades.find(g => g.assignmentId === id && g.studentId === currentStudent?.id)?.grade);
+  const assignmentPriority = (id: string) => statusFor(id) === 'matched' ? 2 : statusFor(id) === 'photo-needed' ? 0 : 1;
   const filteredAssignments = state.assignments.filter((asg) => {
     if (!currentStudent) return false;
     const submission = state.submissions.find(
       (s) => s.assignmentId === asg.id && s.studentId === currentStudent.id
     );
-    const gradeRec = state.grades.find(
-      (g) => g.assignmentId === asg.id && g.studentId === currentStudent.id
-    );
-
-    const isGraded = Boolean(gradeRec && gradeRec.grade);
     const isSubmitted = Boolean(submission);
-
-    if (filter === 'graded') return isGraded;
-    if (filter === 'submitted') return isSubmitted && !isGraded;
-    if (filter === 'pending') return !isSubmitted && !isGraded;
+    if (filter === 'graded') return statusFor(asg.id) === 'matched';
+    if (filter === 'submitted') return isSubmitted && statusFor(asg.id) !== 'matched';
+    if (filter === 'pending') return !isSubmitted;
     return true;
   }).sort((a, b) => assignmentPriority(a.id) - assignmentPriority(b.id));
 
@@ -139,9 +141,9 @@ export const StudentApp: React.FC<StudentAppProps> = ({
           <div className="student-journey" aria-label="Tu avance"><div className="journey-trophy"><Trophy size={38} strokeWidth={1.5}/><span>✦</span></div><div><span>TU ESFUERZO SUMA</span><strong>{myScore?.totalPoints || 0}<small> puntos</small></strong><p>{myScore?.totalPoints ? '¡Sigue construyendo tu camino!' : 'Tu próxima tarea es un buen comienzo.'}</p></div></div>
         </section>
         <section className="student-stats" aria-label="Resumen de mi progreso">
-          <div><span className="stat-icon peach"><Clock size={21}/></span><span><strong>{myScore?.gradesCount.unsubmitted || 0}</strong><small>Por entregar</small></span></div>
-          <div><span className="stat-icon violet"><Camera size={21}/></span><span><strong>{myScore?.gradesCount.awaitingReview || 0}</strong><small>En revisión</small></span></div>
-          <div><span className="stat-icon mint"><CheckCircle2 size={21}/></span><span><strong>{myScore?.assignmentsCompleted || 0}</strong><small>Calificadas</small></span></div>
+          <div><span className="stat-icon peach"><Clock size={21}/></span><span><strong>{state.assignments.filter(a => statusFor(a.id) === 'photo-needed').length}</strong><small>Fotos pendientes</small></span></div>
+          <div><span className="stat-icon violet"><Camera size={21}/></span><span><strong>{state.assignments.filter(a => ['waiting', 'unreadable', 'mismatch'].includes(statusFor(a.id))).length}</strong><small>Por comprobar</small></span></div>
+          <div><span className="stat-icon mint"><CheckCircle2 size={21}/></span><span><strong>{state.assignments.filter(a => statusFor(a.id) === 'matched').length}</strong><small>Coinciden</small></span></div>
           <div><span className="stat-icon gold"><Trophy size={21}/></span><span><strong>#{myScore?.rank || '—'}</strong><small>Puesto en el aula</small></span></div>
         </section>
         {/* TAB 1: MIS DEBERES (TAREAS Y SUBIDA DE FOTOS) */}
@@ -151,7 +153,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Un paso más en tu aprendizaje</h2>
                 <p className="text-xs text-slate-500">
-                  Elige una tarea, da lo mejor de ti y comparte tu trabajo.
+                  Sube la tarea corregida en clase y comprobaremos su nota con el Excel del profesor.
                 </p>
               </div>
 
@@ -185,7 +187,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  En Revisión
+                  Por comprobar
                 </button>
                 <button
                   aria-pressed={filter === 'graded'} onClick={() => setFilter('graded')}
@@ -195,7 +197,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Calificadas
+                  Coinciden
                 </button>
               </div>
             </div>
@@ -254,6 +256,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                     </div>
 
                     <div className="p-4 flex-1 space-y-3">
+                      <GradeVerification submission={submission} officialGrade={gradeRec?.grade} />
                       {asg.description && <div className="text-xs text-slate-600">
                         <p className="line-clamp-3">{asg.description}</p>
                         <details className="mt-2">
@@ -308,7 +311,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                         <div className="p-2.5 bg-amber-50/50 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-start gap-1.5">
                           <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                           <span>
-                            Sube una foto clara de tu trabajo para que tu profesor pueda revisarlo.
+                            Fotografía tu tarea ya corregida, incluyendo la nota escrita por tu profesor.
                           </span>
                         </div>
                       )}
@@ -319,6 +322,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                         onClick={() => {
                           setUploadModalAsg(asg);
                           setPhotoPreview('');
+                          setPhotoReading(null); setIsReading(false);
                           setStudentComment(submission?.comment || '');
                           setUploadError('');
                         }}
@@ -527,6 +531,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                     <div>
                       <span className="text-[10px] font-bold text-indigo-700 uppercase">{asg.subject}</span>
                       <h4 className="text-sm font-bold text-slate-900">{asg.title}</h4>
+                      <div className="mt-2"><GradeVerification submission={submission} officialGrade={gradeRec?.grade} /></div>
                       {gradeRec?.feedback && (
                         <p className="text-xs text-slate-500 italic mt-0.5">"{gradeRec.feedback}"</p>
                       )}
@@ -544,7 +549,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                         </>
                       ) : (
                         <span className="text-xs text-slate-400 italic">
-                          {submission ? 'En revisión' : 'Sin presentar (0 pts)'}
+                          {submission ? 'Registro pendiente' : 'Sin nota registrada'}
                         </span>
                       )}
                     </div>
@@ -580,11 +585,9 @@ export const StudentApp: React.FC<StudentAppProps> = ({
             </div>
 
             <div className="p-5 overflow-y-auto space-y-4">
-              {state.grades.some(g => g.assignmentId === uploadModalAsg.id && g.studentId === currentStudent.id && g.grade) && (
-                <p role="status" className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
-                  Al confirmar una nueva entrega, se quitarán tu nota y tus puntos de esta tarea hasta que el profesor vuelva a revisarla.
-                </p>
-              )}
+              <p className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-indigo-900">
+                Sube tu tarea corregida en clase. Leeremos la nota de la foto y la compararemos con el registro del profesor. Si aún no la registró, te avisaremos que esperes la próxima actualización.
+              </p>
               {uploadModalAsg.description && <p className="text-xs text-slate-600 whitespace-pre-wrap break-words">{uploadModalAsg.description}</p>}
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-4 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors">
                 <Camera className="w-8 h-8 text-indigo-600 mb-2" />
@@ -602,11 +605,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
               </label>
 
 
-              {photoPreview && (
-                <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-900 max-h-52">
-                  <img src={photoPreview} alt="Preview" referrerPolicy="no-referrer" className="w-full h-44 object-contain" />
-                </div>
-              )}
+              {photoPreview && <PhotoGradeReader key={photoPreview} photo={photoPreview} disabled={isSubmitting} onChange={(reading, busy) => { setPhotoReading(reading); setIsReading(busy); }} />}
 
               <div>
                 <label htmlFor="student-comment" className="block text-xs font-semibold text-slate-700 mb-1">
@@ -642,7 +641,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
               </button>
               <button
                 type="button"
-                disabled={isSubmitting || !photoPreview}
+                disabled={isSubmitting || isReading || !photoPreview || !photoReading}
                 onClick={handleSubmitPhoto}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg disabled:opacity-50"
               >

@@ -1,5 +1,7 @@
 # Prueba de uso de EduPuntos
 
+**Actualización del flujo:** el profesor corrige primero en el cuaderno. La foto del alumno se usa para comparar la nota con Excel. Consulta [la implementación y las pruebas de esta comprobación](PHOTO_GRADE_WORKFLOW.md). Sustituye la interpretación anterior de volver a calificar cada foto.
+
 ## Resultado
 
 El flujo principal funciona en una simulación con un profesor y tres alumnos conectados en sesiones independientes. Se publicaron tareas, se entregaron fotos, se calificaron trabajos y se actualizaron notas, comentarios, puntos y ranking entre las cuentas. Se corrigieron los fallos reproducidos durante el recorrido.
@@ -26,7 +28,7 @@ La recomendación es preparar un **piloto pequeño supervisado**, después de co
 | Dos alumnos entregan simultáneamente | Ambas entregas llegan al profesor. La respuesta privada del tercer alumno contiene solo sus entregas y notas. |
 | El profesor asigna AD, A y B y escribe comentarios | Cada alumno ve su nota y comentario; se suman exactamente 10, 8 y 6 puntos respectivamente. |
 | Se abre una foto para revisarla | Funcionan ampliar, girar y cerrar con Escape. Los diálogos mantienen el foco y lo devuelven al control de apertura. |
-| Se reenvía una tarea calificada | Antes de confirmar se avisa que se retirarán nota y puntos; después queda en revisión, sin la calificación ni el comentario guardado de la entrega anterior. |
+| Se reenvía la foto de una tarea calificada | Se conservan nota, puntos y comentario oficial; se vuelve a leer la nota de la nueva foto y se recalcula la comparación. |
 | El profesor escribe un premio mientras un alumno entrega | El borrador se conserva. Al publicarlo y recargar, permanece el premio guardado. |
 | Un Excel contiene una nota válida y otra inválida | Se rechaza todo el lote. Tras recargar, la nota válida tampoco se ha aplicado. |
 | Se corrige ese Excel y se vuelve a importar | Las notas llegan a las cuentas correspondientes y permanecen tras recargar. |
@@ -38,7 +40,7 @@ La recomendación es preparar un **piloto pequeño supervisado**, después de co
 2. **Foto anterior enviada por error:** seleccionar un archivo inválido dejaba habilitada la entrega de la foto previa. Ahora se vacía la selección anterior y se cancelan lecturas de archivos reemplazados.
 3. **Comentario antiguo tras una nueva entrega:** el comentario ya guardado seguía almacenado como borrador en el navegador docente. Ahora, al guardar, se libera ese borrador y se refleja el estado del servidor. Se conserva una edición más reciente si el profesor escribe mientras guarda.
 4. **Instrucciones recortadas:** solo se podían ver tres líneas de la descripción en la tarjeta del alumno. Ahora pueden desplegarse y también se muestran en el formulario de entrega.
-5. **Reenvío sin explicación de sus consecuencias:** ahora se advierte que una nueva entrega retira la nota y los puntos hasta su revisión.
+5. **Reenvío incompatible con la corrección en el cuaderno:** el flujo se corrigió para conservar siempre la nota y los puntos oficiales al reemplazar la foto.
 6. **Ventanas difíciles de usar con teclado:** los formularios de entrega y el visor usan diálogos identificados, recorrido de foco, Escape y retorno al botón de apertura. El campo de archivo es accesible con teclado.
 7. **Errores de conexión poco claros en el modo local:** el fallo de red se explica en español y la entrega se puede reintentar conservando el formulario abierto.
 
@@ -47,8 +49,8 @@ Las dos primeras incidencias y el comentario antiguo se reprodujeron con pruebas
 ## Comprobaciones ejecutadas
 
 - `npm run lint`: sin errores de TypeScript.
-- `npm test`: 22 pruebas aprobadas, incluyendo permisos, persistencia, fotos, Excel y políticas SQL de Supabase en PGlite.
-- `CHROMIUM_PATH=/usr/bin/chromium npm run test:hosted`: 6 pruebas aprobadas en las aplicaciones compiladas, incluido el recorrido completo del aula.
+- `npm test`: 26 pruebas aprobadas, incluyendo permisos, persistencia, fotos, Excel, comparación de notas y políticas SQL de Supabase en PGlite.
+- `CHROMIUM_PATH=/usr/bin/chromium npm run test:hosted`: pruebas aprobadas en las aplicaciones compiladas, incluidos el recorrido completo del aula y el OCR real con una imagen sintética.
 - `CHROMIUM_PATH=/usr/bin/chromium npm run test:netlify`: 1 prueba aprobada de las compilaciones de Netlify con las respuestas de Supabase **simuladas**.
 - `git diff --check`: sin errores de formato del parche.
 

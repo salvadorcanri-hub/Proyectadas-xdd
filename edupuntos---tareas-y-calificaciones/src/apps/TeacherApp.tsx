@@ -30,6 +30,8 @@ import {
   downloadExcel,
 } from '../services/api';
 import { PhotoLightbox } from '../components/PhotoLightbox';
+import { GradeVerification } from '../components/GradeVerification';
+import { verificationStatus } from '../utils/photoVerification';
 
 interface TeacherAppProps {
   state: AppState;
@@ -240,7 +242,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
       <AppNavigation role="teacher" active={activeTab} onChange={tab => setActiveTab(tab as typeof activeTab)} onLogout={onLogout} items={[
         {id:'overview',label:'Inicio',icon:LayoutDashboard},
         {id:'assignments',label:'Tareas',icon:Plus},
-        {id:'reviews',label:'Revisar Fotos',icon:Camera,badge:state.submissions.filter(s => !state.grades.some(g => g.assignmentId === s.assignmentId && g.studentId === s.studentId && g.grade)).length},
+        {id:'reviews',label:'Revisar Fotos',icon:Camera,badge:state.submissions.filter(s => verificationStatus(s, state.grades.find(g => g.assignmentId === s.assignmentId && g.studentId === s.studentId)?.grade) !== 'matched').length},
         {id:'matrix',label:'Planilla Rápida',icon:CheckCircle2},
         {id:'excel',label:'Conectar Excel',icon:FileSpreadsheet},
         {id:'ranking',label:'Podio & Ranking',icon:Trophy},
@@ -288,6 +290,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                   <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                     Sube tu Excel con las notas anotadas (AD, A, B, C o números 10, 8, 6, 4). Las celdas vacías conservan las notas actuales. Escribe BORRAR para quitar una nota. Si hay errores, no se aplica ningún cambio.
                   </p>
+                  <p className="text-xs text-slate-600 mt-2">Al confirmar la importación, se comparan de nuevo las notas con las fotos de los alumnos. Cada actualización de tu archivo requiere volver a importarlo aquí.</p>
                 </div>
                 <div className="mt-4">
                   <label className="flex items-center justify-center border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-lg p-3.5 cursor-pointer bg-slate-50/60 hover:bg-slate-50 transition-colors">
@@ -632,9 +635,10 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                     </div>
 
                     {/* Grading row */}
+                    <div className="mt-3"><GradeVerification submission={submission} officialGrade={currentGrade} teacher /></div>
                     <div className="mt-4 pt-3 border-t border-slate-850 space-y-2">
                       <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                        Calificar Tarea:
+                        Ajuste manual del registro (opcional):
                       </div>
 
                       <div className="grid grid-cols-5 gap-1.5">

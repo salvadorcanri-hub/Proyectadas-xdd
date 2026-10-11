@@ -14,7 +14,7 @@ Cada proyecto de Supabase equivale a un aula/institución compartida: todos sus 
 ## 2. Crear las tablas, funciones y permisos
 
 1. Dentro de Supabase abre **SQL Editor → New query**.
-2. Ejecuta los archivos de `supabase/migrations/` en orden: primero `001_edupuntos.sql` y después `002_photo_authorization.sql`. Copia cada archivo completo, pégalo y pulsa **Run**. Si ya ejecutaste el primero, ejecuta solo el segundo; no vuelvas a aplicar `001` después de `002`.
+2. Ejecuta los archivos de `supabase/migrations/` en orden: `001_edupuntos.sql`, `002_photo_authorization.sql` y `003_photo_grade_comparison.sql`. Copia cada archivo completo, pégalo y pulsa **Run**. Si ya ejecutaste alguno, continúa con los siguientes pendientes; no vuelvas a aplicar una migración antigua después de una nueva. `003` añade la lectura de la nota fotografiada y conserva la calificación oficial cuando se sube otra foto.
 3. Para empezar con ocho estudiantes y tres tareas de ejemplo, ejecuta también `supabase/demo.sql`. Este paso es opcional, no crea cuentas, notas ni fotos y no sustituye datos existentes.
 
 El primer SQL crea las tablas `edu_*`, un bucket **privado** `edupuntos-homework`, las políticas RLS y las funciones de la aplicación. También incorpora `edu_changes` a la publicación `supabase_realtime`, si existe. Comprueba en la configuración de Realtime/replicación que `edu_changes` está habilitada; solo transmite un contador de cambios, nunca fotos o comentarios. La app también vuelve a consultar cada minuto como respaldo.
@@ -69,8 +69,8 @@ En Supabase configura la **Site URL** de Authentication con la dirección HTTPS 
 2. Abre `/alumnos/` y entra con la cuenta del alumno; las dos sesiones pueden convivir en el mismo navegador.
 3. Crea una tarea desde docentes y comprueba que aparece en alumnos.
 4. Sube una foto PNG, JPEG o WebP de hasta 5 MB desde alumnos.
-5. Califícala desde docentes y verifica que la nota aparece en la libreta del alumno.
-6. Descarga la plantilla Excel, modifica una nota y vuelve a importarla. Se aceptan `.xlsx` y `.csv` en UTF-8; guarda los `.xls` antiguos como `.xlsx`. Las celdas vacías conservan notas; `BORRAR` elimina una nota explícitamente. Los cambios del archivo se validan y guardan en una sola transacción.
+5. Sube una foto con la nota escrita por el profesor. Si aún no hay nota en el registro, el alumno verá **Espera la próxima actualización**. La lectura de escritura a mano debe validarse con fotos reales; una imagen dudosa queda sin lectura clara.
+6. Descarga la plantilla Excel, registra la nota de esa tarea y vuelve a importarla. El alumno debe ver la coincidencia o diferencia con la foto sin reenviarla. Se aceptan `.xlsx` y `.csv` en UTF-8; guarda los `.xls` antiguos como `.xlsx`. Las celdas vacías conservan notas; `BORRAR` elimina una nota explícitamente. Los cambios del archivo se validan y guardan en una sola transacción. Repite la importación cada vez que actualices el archivo. Consulta [el flujo de comprobación](PHOTO_GRADE_WORKFLOW.md).
 
 Las fotografías se sirven con enlaces firmados que caducan a los cinco minutos. Como cualquier enlace firmado, quien lo reciba puede usarlo hasta su caducidad; no lo compartas. Las fotos reemplazadas quedan en el almacenamiento hasta su limpieza administrativa: vigila la cuota del plan gratuito. Los roles y el ranking se calculan en la base de datos para que ambas apps y Excel coincidan.
 

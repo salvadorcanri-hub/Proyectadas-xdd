@@ -37,6 +37,14 @@ export interface Submission {
   photoUrl: string;
   submittedAt: string;
   comment?: string;
+  photoReading?: PhotoReading | null;
+}
+
+// A reading of the teacher's handwritten mark, never a grade assigned to the work.
+export interface PhotoReading {
+  status: 'read' | 'uncertain' | 'unavailable';
+  grade: GradeType;
+  confidence: number;
 }
 
 export interface GradeRecord {

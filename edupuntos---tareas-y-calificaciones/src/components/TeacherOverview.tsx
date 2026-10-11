@@ -3,9 +3,10 @@ import { ArrowUpRight, BookOpen, Camera, CheckCheck, Plus, Users, ArrowRight, Fi
 import type { AppState } from '../types';
 import { Avatar } from './Avatar';
 import { calculateStudentScores } from '../utils/scoreCalculator';
+import { verificationStatus } from '../utils/photoVerification';
 
 export function TeacherOverview({ state, navigate, review }: { state: AppState; review: (id: string) => void; navigate: (tab: 'assignments' | 'reviews' | 'matrix' | 'ranking' | 'excel') => void }) {
-  const pending = state.submissions.filter(s => !state.grades.some(g => g.assignmentId === s.assignmentId && g.studentId === s.studentId && g.grade));
+  const pending = state.submissions.filter(s => verificationStatus(s, state.grades.find(g => g.assignmentId === s.assignmentId && g.studentId === s.studentId)?.grade) !== 'matched');
   const graded = state.grades.filter(g => g.grade).length;
   const total = state.students.length * state.assignments.length;
   const progress = total ? Math.round(graded / total * 100) : 0;

@@ -169,20 +169,18 @@ test('classroom journey: three students, interrupted upload, feedback, resubmiss
       await teacher.screenshot({ path: testInfo.outputPath('teacher-classroom.png'), fullPage: true });
       await students[0].screenshot({ path: testInfo.outputPath('student-mobile-report.png'), fullPage: true });
     });
-    await test.step('Warn before replacing graded homework, then require a fresh review', async () => {
+    await test.step('Replace a photo without deleting the official grade or points', async () => {
       const mobile = students[0];
       await mobile.getByRole('button', { name: 'Mis Deberes' }).click();
       await task(mobile).getByRole('button', { name: 'Cambiar / Reenviar Foto' }).click();
-      await expect(mobile.getByRole('dialog').getByRole('status')).toContainText('se quitarán tu nota y tus puntos');
+      await expect(mobile.getByRole('dialog')).toContainText('Leeremos la nota de la foto');
       await mobile.locator('input[type=file]').setInputFiles(photo);
       await mobile.getByLabel('Comentario al profesor:').fill('Camila: segunda versión con la conclusión corregida');
       await mobile.getByRole('button', { name: 'Confirmar Entrega' }).click();
       await expect(mobile.getByRole('dialog')).toHaveCount(0);
-      await expect(task(mobile).getByText('Foto Enviada', { exact: true })).toBeVisible();
-      await expect(task(mobile).getByText('Nota AD')).toHaveCount(0);
-      await expect(mobile.locator('.student-journey strong')).toHaveText(`${initialPoints[0]} puntos`);
-      await expect(reviewCard('Camila Mendoza').getByText('Sin calificar (0 pts)')).toBeVisible();
-      await expect(reviewCard('Camila Mendoza').getByPlaceholder('Retroalimentación al estudiante...')).toHaveValue('');
+      await expect(task(mobile).getByText('Nota AD', { exact: true })).toBeVisible();
+      await expect(mobile.locator('.student-journey strong')).toHaveText(`${initialPoints[0] + 10} puntos`);
+      await expect(reviewCard('Camila Mendoza').getByPlaceholder('Retroalimentación al estudiante...')).toHaveValue('Buen trabajo, Camila. Revisa la conclusión.');
     });
     await test.step('Download Excel, reject a partially invalid sheet atomically, then import corrected grades', async () => {
       await teacher.getByRole('button', { name: 'Conectar Excel' }).click();
@@ -200,7 +198,7 @@ test('classroom journey: three students, interrupted upload, feedback, resubmiss
       await upload();
       await expect(teacher.getByText(/nota «NOTA INCORRECTA» inválida/)).toBeVisible();
       await students[0].reload();
-      await expect(task(students[0]).getByText('Foto Enviada', { exact: true })).toBeVisible();
+      await expect(task(students[0]).getByText('Nota AD', { exact: true })).toBeVisible();
       sheet[1][col] = 'AD'; sheet[2][col] = 'B';
       await upload();
       await expect(teacher.getByRole('button', { name: 'Confirmar y Guardar Notas' })).toHaveCount(0);

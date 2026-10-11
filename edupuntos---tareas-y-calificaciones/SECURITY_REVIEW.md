@@ -41,7 +41,9 @@ Avisos consultados:
 
 ## Aplicación de los cambios y límites
 
-Cuando crees Supabase, ejecuta las migraciones en orden: `001_edupuntos.sql` y `002_photo_authorization.sql`. Si ya ejecutaste `001`, aplica `002`. El archivo de cabeceras se genera al compilar para Netlify; será efectivo al desplegar esa compilación.
+La función de comparación posterior a esta revisión añade `003_photo_grade_comparison.sql`, que debe aplicarse después de `001` y `002`. Guarda la lectura de la foto como dato orientativo del cliente y conserva el registro oficial. Las lecturas no conceden puntos ni cambian notas. La CSP permite `wasm-unsafe-eval` para el OCR local y mantiene bloqueados los scripts insertados en línea y la evaluación de JavaScript arbitrario. Consulta [sus pruebas y límites](PHOTO_GRADE_WORKFLOW.md).
+
+Cuando crees Supabase, ejecuta las migraciones en orden: `001_edupuntos.sql`, `002_photo_authorization.sql` y `003_photo_grade_comparison.sql`. Aplica solo las migraciones pendientes. El archivo de cabeceras se genera al compilar para Netlify; será efectivo al desplegar esa compilación.
 
 Los archivos `.xls` antiguos deben guardarse como `.xlsx` o `.csv` en UTF-8. Este cambio evita conservar el lector vulnerable por compatibilidad. Las plantillas `.xlsx` del proyecto siguen siendo compatibles.
 

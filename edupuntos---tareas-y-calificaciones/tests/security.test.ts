@@ -90,7 +90,8 @@ test('session revocation, stream limits and HTTP hardening apply to authenticate
   const state = await call('student', '/state', cookie);
   assert.equal(state.headers.get('cache-control'), 'no-store');
   assert.equal(state.headers.get('x-frame-options'), 'DENY');
-  assert.match(state.headers.get('content-security-policy')!, /script-src 'self';/);
+  assert.match(state.headers.get('content-security-policy')!, /script-src 'self' 'wasm-unsafe-eval';/);
+  assert.doesNotMatch(state.headers.get('content-security-policy')!, /script-src[^;]*'unsafe-(?:inline|eval)'/);
   assert.match(state.headers.get('content-security-policy')!, /frame-ancestors 'none'/);
   assert.equal(state.headers.get('referrer-policy'), 'no-referrer');
   const controllers: AbortController[] = [];

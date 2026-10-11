@@ -4,6 +4,8 @@
 
 Consulta también el [informe de pruebas de uso en un aula](QA_CLASSROOM.md), con los recorridos comprobados, las incidencias corregidas y lo que falta validar con usuarios reales.
 
+**Flujo principal:** el profesor corrige en el cuaderno, el alumno sube la foto desde casa y la app compara la nota fotografiada con el registro actualizado desde Excel. Consulta [cómo funciona la comprobación y sus límites](PHOTO_GRADE_WORKFLOW.md).
+
 Dos aplicaciones web independientes conectadas a una API común:
 
 - **Docentes**: tareas, revisión de fotos, calificaciones, Excel y premios.
@@ -58,7 +60,7 @@ Variables opcionales:
 - `TEACHER_PORT` y `STUDENT_PORT`: puertos de desarrollo.
 - `APP_PORT` y `APP_HOST`: puerto y dirección del servidor de una app compilada.
 
-No se requiere Gemini ni una clave de IA. La aplicación no utiliza inteligencia artificial.
+No se requiere Gemini ni una clave de IA. La lectura de notas usa Tesseract.js en el navegador, con el motor y el modelo incluidos en la compilación.
 
 ## Datos y migración
 
@@ -66,18 +68,19 @@ La API usa `data/edupuntos.sqlite` con transacciones, claves externas y modo WAL
 
 Al arrancar por primera vez, si existe el antiguo `data/db.json`, se copia a `data/db.json.backup` y se importa a SQLite. Se conservan notas, tareas, estudiantes, premios y entregas, y se extraen las imágenes Base64. El JSON original permanece intacto. Si la migración falla, el arranque se interrumpe para evitar sustituir datos por una demostración. Tras una migración correcta, SQLite pasa a ser la fuente de datos; editar el JSON ya no afecta a la aplicación.
 
-Sin datos previos se crea el aula de demostración. No se crean cuentas automáticamente. Haz copias de seguridad de todo `DATA_DIR` con el servicio detenido, incluyendo fotografías, SQLite y los archivos WAL/SHM que existan. No borres los datos como parte de una instalación. Los archivos de fotos que queden sin referencias tras reemplazar una entrega se conservan para evitar eliminar material; no hay limpieza automática.
+Sin datos previos se crea el aula de demostración. No se crean cuentas automáticamente. Haz copias de seguridad de todo `DATA_DIR` con el servicio detenido, incluyendo fotografías, SQLite y los archivos WAL/SHM que existan. No borres los datos como parte de una instalación. Tras reemplazar una entrega o eliminar una tarea, se retiran únicamente las fotos de esa operación que ya no tengan referencias. Los archivos antiguos sin referencias requieren una limpieza administrativa aparte.
 
 ## Calificaciones, entregas y Excel
 
 - AD = 10 puntos; A = 8; B = 6; C = 4.
-- Una tarea entregada sin nota aparece **en revisión**; una tarea sin entrega ni nota está **pendiente**.
-- Reemplazar una foto elimina la calificación anterior de esa tarea para que el docente revise la nueva entrega.
+- Una foto sin nota en el registro muestra **Espera la próxima actualización**. Las fotos legibles con nota registrada muestran coincidencia o diferencia; las lecturas dudosas requieren una imagen más clara.
+- Reemplazar una foto conserva la nota oficial, los comentarios del profesor y los puntos. La lectura de la imagen nunca escribe calificaciones.
 - El ranking y Excel usan el mismo cálculo: puntos, número de tareas calificadas, nombre en español e identificador para un desempate estable.
 - Descarga la plantilla desde la app docente. Conserva la columna **CÓDIGO** y los identificadores de tarea `[asg-…]`.
 - Las celdas vacías **conservan** las notas existentes. `BORRAR` elimina explícitamente una nota, sin eliminar la entrega.
 - Se aceptan AD/A/B/C y sus equivalencias 10/8/6/4. Otras notas, códigos desconocidos, duplicados o columnas ambiguas rechazan **todo** el archivo, sin cambios parciales.
 - Se admiten hasta 10000 filas y archivos de hasta 5 MB. No se asocian tareas por posición ni estudiantes por nombres parciales.
+- Cada cambio en el archivo Excel debe importarse en la app docente; no hay conexión automática con Excel de escritorio ni OneDrive. Al importar, se vuelven a comparar las fotos guardadas.
 
 ## Pruebas y compilación
 

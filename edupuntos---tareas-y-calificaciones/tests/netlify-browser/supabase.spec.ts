@@ -3,6 +3,7 @@ import { seedState } from '../../server/seed';
 import { calculateStudentScores } from '../../src/utils/scoreCalculator';
 import { workbookBuffer, readWorkbook } from '../workbook-helpers';
 import { readFileSync } from 'node:fs';
+import { markedPhoto } from '../photo-fixture';
 
 test('Netlify bundles: separate Supabase logins, uploads, grading and Excel (mocked HTTP boundary)', async ({ browser }) => {
   const state = seedState(); state.submissions=[]; state.grades=[]; state.students.forEach(s=>s.avatar='');
@@ -55,7 +56,7 @@ test('Netlify bundles: separate Supabase logins, uploads, grading and Excel (moc
       return reply(body.paths.map((p:string)=>({path:p,signedURL:`/object/sign/edupuntos-homework/${p}?token=test-only`,error:null})));
     }
     if(name==='edu_submit') {
-      state.submissions.push({id:'submitted',studentId:user.studentId!,assignmentId:body.p_assignment_id,photoUrl:body.p_photo_path,submittedAt:new Date().toISOString(),comment:body.p_comment});
+      state.submissions.push({id:'submitted',studentId:user.studentId!,assignmentId:body.p_assignment_id,photoUrl:body.p_photo_path,submittedAt:new Date().toISOString(),comment:body.p_comment,photoReading:body.p_photo_reading});
       notify(); return reply(null);
     }
     if(name==='edu_set_grade') {
@@ -83,16 +84,19 @@ test('Netlify bundles: separate Supabase logins, uploads, grading and Excel (moc
     await expect(page.getByRole('button',{name:'Cerrar sesión'})).toBeVisible();
   }
   await student.getByRole('button',{name:'Tomar / Subir Foto',exact:true}).first().click();
-  await student.locator('input[type=file]').setInputFiles({name:'tarea.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64')});
+  await student.locator('input[type=file]').setInputFiles(await markedPhoto(student, 'AD'));
+  await expect(student.getByRole('status')).toHaveText('Nota detectada en la foto: AD', {timeout:35000});
   await student.getByRole('button',{name:'Confirmar Entrega',exact:true}).click();
   await expect(student.getByRole('heading',{name:/Subir Foto:/})).toHaveCount(0);
   expect(uploads).toBe(1); expect(signedRequests).toBeGreaterThan(0);
+  await expect(student.getByText('Espera la próxima actualización', {exact:true})).toBeVisible();
   await teacher.getByRole('button',{name:'Planilla Rápida'}).click();
   const row = teacher.getByRole('row').filter({hasText:'Camila Mendoza'});
   await expect(row.getByTitle('Ver foto de la tarea')).toBeVisible();
   await row.locator('select').first().selectOption('AD');
   await student.getByRole('button',{name:'Mi Libreta'}).click();
   await expect(student.getByText('Nota AD',{exact:true})).toBeVisible();
+  await expect(student.getByText('Coincide con Excel',{exact:true})).toBeVisible();
   await teacher.getByRole('button',{name:'Conectar Excel'}).click();
   const downloaded = teacher.waitForEvent('download');
   await teacher.getByRole('button',{name:'Descargar .XLSX'}).click();
@@ -102,6 +106,7 @@ test('Netlify bundles: separate Supabase logins, uploads, grading and Excel (moc
   await teacher.locator('input[type=file]').setInputFiles({name:'notas.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:await workbookBuffer(sheet)});
   await teacher.getByRole('button',{name:'Confirmar y Guardar Notas'}).click();
   await expect(student.getByText('Nota B',{exact:true})).toBeVisible();
+  await expect(student.getByText('Las notas son diferentes',{exact:true})).toBeVisible();
   await student.getByRole('button',{name:'Cerrar sesión'}).click();
   await expect(student.getByRole('button',{name:'Entrar',exact:true})).toBeVisible();
   await teacher.reload(); await expect(teacher.getByRole('button',{name:'Cerrar sesión'})).toBeVisible();

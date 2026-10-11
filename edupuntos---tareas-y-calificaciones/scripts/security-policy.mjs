@@ -4,7 +4,7 @@ export function contentSecurityPolicy(supabaseUrl) {
   const socket = origin ? origin.replace(/^https:/, 'wss:') : '';
   return [
     "default-src 'self'",
-    "script-src 'self'",
+    "script-src 'self' 'wasm-unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: https://images.unsplash.com ${origin}`.trim(),
     `connect-src 'self' ${origin} ${socket}`.trim(),

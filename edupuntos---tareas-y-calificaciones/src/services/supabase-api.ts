@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { AppState, GradeType, RewardsConfig, User } from '../types';
+import type { AppState, GradeType, RewardsConfig, User, PhotoReading } from '../types';
 
 let instance: SupabaseClient | undefined;
 const bucket = 'edupuntos-homework';
@@ -62,7 +62,7 @@ export async function fetchState(): Promise<AppState> {
   for (const path of signed.keys()) if (!paths.includes(path)) signed.delete(path);
   return { ...state, submissions: state.submissions.map(s => ({ ...s, photoUrl: signed.get(s.photoUrl)!.url })) };
 }
-export async function submitHomework(assignmentId: string, studentId: string, photoUrl: string, comment?: string): Promise<AppState> {
+export async function submitHomework(assignmentId: string, studentId: string, photoUrl: string, comment?: string, photoReading?: PhotoReading | null): Promise<AppState> {
   const user = await currentUser();
   if (user.role !== 'student' || user.studentId !== studentId) throw new Error('No puedes entregar la tarea de otro estudiante.');
   const match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(photoUrl);
@@ -72,7 +72,7 @@ export async function submitHomework(assignmentId: string, studentId: string, ph
   const path = `${user.id}/${crypto.randomUUID()}.${match[1]}`;
   const { error } = await client().storage.from(bucket).upload(path, bytes, { contentType: `image/${match[1]}`, upsert: false });
   if (error) throw failure(error);
-  try { await rpc('edu_submit', { p_assignment_id: assignmentId, p_photo_path: path, p_comment: comment || '' }); }
+  try { await rpc('edu_submit', { p_assignment_id: assignmentId, p_photo_path: path, p_comment: comment || '', p_photo_reading: photoReading || null }); }
   catch (error) {
     // Storage RLS prevents deleting a file if an ambiguous network response actually committed it.
     await client().storage.from(bucket).remove([path]);
