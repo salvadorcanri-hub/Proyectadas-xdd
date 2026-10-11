@@ -1,4 +1,5 @@
 import { AppState, GradeType, RewardsConfig, PhotoReading } from '../types';
+import { validateRegistration, type StudentRegistration } from '../utils/registration';
 
 export const API_BASE = `/api/${__APP_ROLE__}`;
 export async function request(endpoint: string, options: RequestInit = {}) {
@@ -49,5 +50,6 @@ export function subscribeToRealtimeUpdates(onUpdate: (state: AppState) => void):
 
 export async function currentUser() { return (await request('/auth/me')).user; }
 export async function login(username: string, password: string) { return request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }); }
+export async function register(input: StudentRegistration): Promise<{ confirmationRequired: boolean }> { return request('/auth/register', { method: 'POST', body: JSON.stringify(validateRegistration(input)) }); }
 export async function logout() { await request('/auth/logout', { method: 'POST', body: '{}' }); }
 export async function downloadExcel() { window.location.href = `${API_BASE}/excel-export`; }

@@ -11,16 +11,18 @@ for (const role of ['teacher', 'student'] as const) {
     await expect(root).toHaveAttribute('data-theme', 'dark');
     await page.emulateMedia({ colorScheme: 'light' });
     await expect(root).toHaveAttribute('data-theme', 'light');
-    await page.getByText('Configuración', { exact: true }).click();
-    await page.getByLabel('Tema de la aplicación').selectOption('dark');
-    await page.reload();
-    await expect(root).toHaveAttribute('data-theme', 'dark');
+    await expect(page.getByText('Configuración', { exact: true })).toHaveCount(0);
     await page.getByLabel('Usuario', { exact: true }).fill(`test-${role}`);
     await page.getByLabel('Contraseña', { exact: true }).fill('Browser-test-only-123');
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
     const settings = page.getByRole('button', { name: 'Configuración', exact: true });
     await settings.click();
     await expect(page.getByRole('dialog', { name: 'Configuración' })).toBeVisible();
+    await expect(page.getByLabel('Tema de la aplicación')).toHaveValue('system');
+    await page.getByLabel('Tema de la aplicación').selectOption('dark');
+    await page.reload();
+    await expect(root).toHaveAttribute('data-theme', 'dark');
+    await settings.click();
     await expect(page.getByLabel('Tema de la aplicación')).toHaveValue('dark');
     await page.getByLabel('Tema de la aplicación').selectOption('system');
     await expect(root).toHaveAttribute('data-theme', 'light');
@@ -42,6 +44,10 @@ for (const role of ['teacher', 'student'] as const) {
       if (width === 390) await page.screenshot({ animations: 'disabled', path: testInfo.outputPath(`${role}-settings-mobile.png`) });
       await page.getByRole('button', { name: 'Cerrar configuración' }).click();
     }
+    await page.getByRole('button', { name: 'Cerrar sesión' }).click();
+    await expect(page.getByRole('button', { name: 'Entrar', exact: true })).toBeVisible();
+    await expect(page.getByText('Configuración', { exact: true })).toHaveCount(0);
+    await expect(root).toHaveAttribute('data-theme', 'dark');
     expect(errors).toEqual([]);
   });
 }

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AppState, GradeType, RewardsConfig, User, PhotoReading } from '../types';
+import { validateRegistration, type StudentRegistration } from '../utils/registration';
 
 let instance: SupabaseClient | undefined;
 const bucket = 'edupuntos-homework';
@@ -35,11 +36,45 @@ export async function currentUser(): Promise<User> {
   if (user.role !== __APP_ROLE__) throw Object.assign(new Error(`Esta cuenta no tiene acceso a la aplicación de ${__APP_ROLE__ === 'teacher' ? 'profesores' : 'alumnos'}.`), { code: '42501' });
   return user;
 }
-export async function login(email: string, password: string) {
-  const { error } = await client().auth.signInWithPassword({ email: email.trim(), password });
-  if (error) throw new Error('No se pudo iniciar sesión. Revisa tu correo y contraseña.');
+export async function login(identifier: string, password: string) {
+  if (/^\d{8}$/.test(identifier.trim()) && __APP_ROLE__ === 'student') {
+    let response: Response;
+    try { response = await fetch('/.netlify/functions/dni-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dni: identifier.trim(), password }) }); }
+    catch { throw new Error('No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.'); }
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'No se pudo iniciar sesión con DNI. Intenta con tu correo.');
+    const { error } = await client().auth.setSession(result);
+    if (error) throw new Error('No se pudo abrir la sesión. Inténtalo de nuevo.');
+  } else {
+    const { error } = await client().auth.signInWithPassword({ email: identifier.trim(), password });
+    if (error) throw new Error(error.code === 'email_not_confirmed' ? 'Confirma tu correo antes de ingresar. Revisa el mensaje de Supabase, incluida la carpeta de spam.' : 'No se pudo iniciar sesión. Revisa tu correo y contraseña.');
+  }
   try { return await currentUser(); }
   catch (error) { await client().auth.signOut({ scope: 'local' }); throw error; }
+}
+export async function register(input: StudentRegistration): Promise<{ confirmationRequired: boolean }> {
+  if (__APP_ROLE__ !== 'student') throw new Error('Las cuentas docentes las asigna el administrador.');
+  const data = validateRegistration(input);
+  // Check the required migration before creating an Auth account without a student profile.
+  try { if (!await rpc<boolean>('edu_registration_available')) throw new Error(); }
+  catch { throw new Error('El registro de alumnos todavía no está configurado. Contacta al administrador.'); }
+  const { data: result, error } = await client().auth.signUp({ email: data.email, password: data.password, options: {
+    emailRedirectTo: `${window.location.origin}/alumnos/`,
+    data: { signup_kind: 'student', first_name: data.firstName, last_name: data.lastName, dni: data.dni },
+  } });
+  if (error) {
+    const messages: Record<string, string> = {
+      signup_disabled: 'El registro aún no está habilitado. Contacta al administrador.',
+      over_email_send_rate_limit: 'Espera unos minutos antes de solicitar otro correo de confirmación.',
+      over_request_rate_limit: 'Demasiados intentos. Espera unos minutos y vuelve a intentarlo.',
+      weak_password: 'Elige una contraseña más segura, de al menos 12 caracteres.',
+    };
+    throw new Error(messages[error.code || ''] || 'No se pudo crear la cuenta con esos datos. Si ya tienes cuenta, inicia sesión; si el problema continúa, contacta al administrador.');
+  }
+  if (!result.session) return { confirmationRequired: true };
+  try { await currentUser(); }
+  catch { await client().auth.signOut({ scope: 'local' }); throw new Error('La cuenta se creó, pero falta configurar su perfil de alumno. Contacta al administrador.'); }
+  return { confirmationRequired: false };
 }
 export async function logout() {
   const { error } = await client().auth.signOut({ scope: 'local' });

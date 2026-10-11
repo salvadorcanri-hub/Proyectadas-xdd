@@ -1,4 +1,5 @@
 import { landingPage } from '../scripts/landing-page.mjs';
+import { registerStudent } from './auth';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
@@ -62,14 +63,15 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
   });
   app.post('/api/:portal/auth/login', express.json({ limit: '4kb' }), async (req, res, next) => {
     try {
-      const username = text(req.body?.username, 'Usuario', 80);
+      const username = text(req.body?.username, 'Usuario', 254);
       text(req.body?.password, 'Contraseña', 128);
       const password = req.body.password as string;
       const role = res.locals.role as User['role'];
       const now = Date.now();
       for (const [key, attempt] of attempts) if (attempt.until <= now) attempts.delete(key);
       // Limit globally per account as well as per source; proxy headers are deliberately not trusted.
-      const keys = [`user:${role}:${username.toLowerCase()}`, `ip:${req.ip}`];
+      const identity = store.db.prepare('SELECT u.id FROM users u LEFT JOIN student_accounts a ON a.user_id=u.id WHERE (u.username=? OR a.dni=?) AND u.role=?').get(username,username,role);
+      const keys = [`user:${role}:${identity?.id || username.toLowerCase()}`, `ip:${req.ip}`];
       if (keys.some(key => (attempts.get(key)?.count || 0) >= (key.startsWith('ip:') ? 50 : 10))) {
         res.setHeader('Retry-After', '900'); return res.status(429).json({ error: 'Demasiados intentos. Intenta de nuevo en 15 minutos.' });
       }
@@ -83,6 +85,22 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
       res.cookie(cookieName(role), token, cookieOptions(role));
       res.json({ user });
     } catch (error) { next(error); }
+  });
+  app.post('/api/:portal/auth/register', express.json({ limit: '4kb' }), async (req, res) => {
+    if (res.locals.role !== 'student') return res.status(403).json({ error: 'Las cuentas docentes las asigna el administrador.' });
+    const key = `signup:${req.ip}`, now = Date.now();
+    for (const [key, attempt] of attempts) if (attempt.until <= now) attempts.delete(key);
+    const attempt = attempts.get(key) || { count: 0, until: now + 15 * 60 * 1000 };
+    attempts.set(key, { ...attempt, count: attempt.count + 1 });
+    if (attempt.count >= 10) { res.setHeader('Retry-After','900'); return res.status(429).json({ error: 'Demasiados intentos. Intenta de nuevo en 15 minutos.' }); }
+    try {
+      const user = await registerStudent(store, req.body);
+      const previous = cookieToken(req, 'student');
+      if (previous) store.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash(previous));
+      res.cookie(cookieName('student'), createSession(store,user), cookieOptions('student'));
+      notify();
+      return res.status(201).json({ confirmationRequired: false });
+    } catch (error) { return res.status(400).json({ error: (error as Error).message }); }
   });
   app.use('/api/:portal', (req, res, next) => {
     const user = sessionUser(store, cookieToken(req, res.locals.role), res.locals.role);

@@ -14,7 +14,7 @@ Cada proyecto de Supabase equivale a un aula/institución compartida: todos sus 
 ## 2. Crear las tablas, funciones y permisos
 
 1. Dentro de Supabase abre **SQL Editor → New query**.
-2. Ejecuta los archivos de `supabase/migrations/` en orden: `001_edupuntos.sql`, `002_photo_authorization.sql` y `003_photo_grade_comparison.sql`. Copia cada archivo completo, pégalo y pulsa **Run**. Si ya ejecutaste alguno, continúa con los siguientes pendientes; no vuelvas a aplicar una migración antigua después de una nueva. `003` añade la lectura de la nota fotografiada y conserva la calificación oficial cuando se sube otra foto.
+2. Ejecuta los archivos de `supabase/migrations/` en orden: `001_edupuntos.sql`, `002_photo_authorization.sql`, `003_photo_grade_comparison.sql` y `004_student_registration.sql`. Copia cada archivo completo, pégalo y pulsa **Run**. Si ya ejecutaste alguno, continúa con los siguientes pendientes; no vuelvas a aplicar una migración antigua después de una nueva. `003` añade la comparación de notas; `004` habilita los perfiles del registro de alumnos y la búsqueda privada para acceder con DNI.
 3. Para empezar con ocho estudiantes y tres tareas de ejemplo, ejecuta también `supabase/demo.sql`. Este paso es opcional, no crea cuentas, notas ni fotos y no sustituye datos existentes.
 
 El primer SQL crea las tablas `edu_*`, un bucket **privado** `edupuntos-homework`, las políticas RLS y las funciones de la aplicación. También incorpora `edu_changes` a la publicación `supabase_realtime`, si existe. Comprueba en la configuración de Realtime/replicación que `edu_changes` está habilitada; solo transmite un contador de cambios, nunca fotos o comentarios. La app también vuelve a consultar cada minuto como respaldo.
@@ -24,13 +24,13 @@ No hagas público el bucket y no desactives RLS para resolver errores. Los profe
 ## 3. Crear una cuenta docente y otra de alumno
 
 1. Abre **Authentication → Users → Add user** y crea una cuenta con correo y contraseña para el profesor y otra diferente para el alumno. Usa la opción de confirmar el correo administrativamente si estás creando cuentas de prueba; así no dependes del envío de correo.
-2. Si no quieres inscripciones públicas, deshabilita el registro de nuevos usuarios en la configuración de Authentication. Registrarse por sí solo nunca concede acceso al aula.
+2. Para permitir que los alumnos se registren desde la web, habilita las inscripciones en Authentication y sigue la [guía de cuentas de alumnos](STUDENT_ACCOUNTS.md), incluida la confirmación del correo y el acceso por DNI. El registro público solo concede el rol de alumno.
 3. Abre `supabase/profiles.example.sql`, sustituye los dos correos por los que acabas de crear y ejecútalo en SQL Editor.
 4. El profesor recibe rol `teacher`. El alumno queda vinculado a `est-1` (Camila, si cargaste la demostración). Para añadir más alumnos, crea sus cuentas y asígnales identificadores distintos, como `est-2`, `est-3`, etc.
 
 La segunda migración protege las fotografías si se cambia el alumno asociado a una cuenta.
 
-El rol se guarda en `edu_profiles`, no en metadatos que pueda modificar el usuario. Una cuenta sin perfil asignado no puede entrar a los datos. Las cuentas de la versión SQLite anterior **no se transfieren**; crea las cuentas nuevas en Supabase Auth. La recuperación de contraseñas en la interfaz no está implementada: el administrador debe gestionarla desde Supabase.
+El rol se guarda en `edu_profiles`. Los alumnos que se registran desde la app reciben un perfil de alumno al confirmar su correo; ningún metadato concede permisos docentes. Las cuentas creadas administrativamente necesitan la asignación indicada arriba. Las cuentas de SQLite **no se transfieren**. La recuperación de contraseñas en la interfaz no está implementada: el administrador debe gestionarla desde Supabase.
 
 ## 4. Obtener los dos datos públicos del proyecto
 
@@ -41,7 +41,7 @@ En los ajustes del proyecto o el diálogo **Connect**, localiza:
 | `VITE_SUPABASE_URL` | La URL de proyecto, con formato `https://…supabase.co` |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | La clave pública **publishable**, normalmente `sb_publishable_…`. Si tu proyecto muestra claves antiguas, sirve la clave **anon**. |
 
-Estas dos variables se incorporan al navegador por diseño; la seguridad depende de Auth y RLS. **Nunca uses `service_role`, una clave `sb_secret_…`, una contraseña de base de datos ni un token personal.** El compilador rechaza claves secretas reconocibles.
+Estas dos variables se incorporan al navegador por diseño; la seguridad depende de Auth y RLS. **Nunca pongas `service_role`, `sb_secret_…` ni contraseñas en variables `VITE_*`.** El compilador rechaza claves secretas reconocibles. El acceso por DNI requiere además `SUPABASE_SECRET_KEY`, únicamente para la función del servidor de Netlify; consulta [su configuración](STUDENT_ACCOUNTS.md).
 
 ## 5. Conectar Netlify con GitHub
 
@@ -61,7 +61,7 @@ La dirección HTTPS de Netlify ofrece:
 - `/docentes/`: aplicación docente.
 - `/alumnos/`: aplicación de alumnos.
 
-En Supabase configura la **Site URL** de Authentication con la dirección HTTPS de Netlify. El inicio de sesión actual usa correo y contraseña, no OAuth ni enlaces mágicos. No necesita desplegar funciones de Netlify ni configurar `/api`: el navegador se conecta directamente a Supabase con los permisos de su usuario.
+En Supabase configura la **Site URL** de Authentication con la dirección HTTPS de Netlify y permite la URL `/alumnos/` para volver desde la confirmación del correo. El acceso usa correo o DNI y contraseña. El correo se autentica directamente con Supabase; el DNI usa `/.netlify/functions/dni-login`, que Netlify despliega desde el repositorio. No configures `/api` para esta modalidad.
 
 ## 6. Comprobar que funciona
 

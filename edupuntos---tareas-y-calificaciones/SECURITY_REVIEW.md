@@ -45,6 +45,8 @@ La función de comparación posterior a esta revisión añade `003_photo_grade_c
 
 Cuando crees Supabase, ejecuta las migraciones en orden: `001_edupuntos.sql`, `002_photo_authorization.sql` y `003_photo_grade_comparison.sql`. Aplica solo las migraciones pendientes. El archivo de cabeceras se genera al compilar para Netlify; será efectivo al desplegar esa compilación.
 
+El registro de alumnos añade posteriormente `004_student_registration.sql`. El DNI se guarda en una tabla privada sin lectura para alumnos o profesores; la función de Netlify comprueba la contraseña con Supabase Auth antes de devolver una sesión y no revela el correo resuelto en respuestas fallidas. Se verifican límites por DNI y origen en PostgreSQL, duplicados sin fichas huérfanas, espera de confirmación de correo y rechazo de metadatos que intentan conceder el rol docente. Las claves del servidor se excluyen de los archivos públicos mediante una prueba de compilación. Consulta [la configuración y los límites del registro](STUDENT_ACCOUNTS.md); el formato del DNI no acredita la identidad de su titular.
+
 Los archivos `.xls` antiguos deben guardarse como `.xlsx` o `.csv` en UTF-8. Este cambio evita conservar el lector vulnerable por compatibilidad. Las plantillas `.xlsx` del proyecto siguen siendo compatibles.
 
 Las fotos antiguas sin referencias que ya existan en SQLite requieren una limpieza administrativa aparte. En Supabase la limpieza física de objetos reemplazados sigue siendo administrativa; no se borra directamente de `storage.objects`, porque eso no elimina los archivos almacenados por el servicio. Deben revisarse las cuotas de almacenamiento y los límites de solicitudes del proyecto al configurarlo.

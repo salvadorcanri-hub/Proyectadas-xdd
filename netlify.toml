@@ -7,6 +7,10 @@
   NODE_VERSION = "24.19.0"
   BUN_VERSION = "1.4.2"
 
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # Existing assets are served as files. Unknown asset requests must not receive SPA HTML.
 [[redirects]]
   from = "/docentes/assets/*"

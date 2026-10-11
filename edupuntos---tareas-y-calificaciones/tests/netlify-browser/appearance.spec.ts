@@ -1,46 +1,26 @@
 import { test, expect } from '@playwright/test';
 
-test('appearance survives navigation and synchronizes tabs under production CSP', async ({ context, page }, testInfo) => {
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(error.message));
-  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  await context.route('https://test-project.supabase.co/**', route => route.fulfill({ status: 401, contentType: 'application/json', body: '{}' }));
+test('public pages follow the saved theme but expose no settings', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('http://127.0.0.1:3200/');
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await page.getByText('Configuración', { exact: true }).click();
-  await expect(page.getByLabel('Tema de la aplicación')).toHaveValue('system');
-  await page.getByLabel('Tema de la aplicación').selectOption('light');
-  await page.screenshot({ animations: 'disabled', path: testInfo.outputPath('landing-light.png') });
-  await page.getByRole('link', { name: /Profesores/ }).click();
-  await expect(page.getByRole('heading', { name: 'EduPuntos Docentes' })).toBeVisible();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  const second = await context.newPage();
-  await second.emulateMedia({ colorScheme: 'dark' });
-  await second.goto('http://127.0.0.1:3200/alumnos/');
-  await second.getByText('Configuración', { exact: true }).click();
-  await expect(second.getByLabel('Tema de la aplicación')).toHaveValue('light');
-  await page.getByText('Configuración', { exact: true }).click();
-  await page.getByLabel('Tema de la aplicación').selectOption('dark');
-  await expect(second.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(second.getByLabel('Tema de la aplicación')).toHaveValue('dark');
-  await second.getByLabel('Tema de la aplicación').selectOption('system');
-  await expect(page.getByLabel('Tema de la aplicación')).toHaveValue('system');
-  await page.goto('http://127.0.0.1:3200/');
-  await page.getByText('Configuración', { exact: true }).click();
-  await page.screenshot({ animations: 'disabled', path: testInfo.outputPath('landing-dark.png') });
-  expect(errors).toEqual([]);
-  await second.close();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  await expect(page.getByText('Configuración',{exact:true})).toHaveCount(0);
+  // A choice previously made inside the app still applies to the public entry points.
+  await page.evaluate(() => localStorage.setItem('edupuntos.appearance','light'));
+  for(const route of ['/', '/docentes/', '/alumnos/']) {
+    await page.goto(`http://127.0.0.1:3200${route}`);
+    await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+    await expect(page.getByText('Configuración',{exact:true})).toHaveCount(0);
+  }
 });
 
-test('blocked storage still allows changing appearance', async ({ page }) => {
+test('blocked storage falls back to the system on the public landing page', async ({ page }) => {
   await page.addInitScript(() => {
-    Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Blocked', 'SecurityError'); } });
+    Object.defineProperty(window,'localStorage',{get(){throw new DOMException('Blocked','SecurityError');}});
   });
-  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.emulateMedia({colorScheme:'dark'});
   await page.goto('http://127.0.0.1:3200/');
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await page.getByText('Configuración', { exact: true }).click();
-  await page.getByLabel('Tema de la aplicación').selectOption('light');
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  await page.emulateMedia({colorScheme:'light'});
+  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
 });

@@ -1408,7 +1408,7 @@ button:disabled {
   background:var(--theme-soft, #fafbf8);
   min-height:48px;
 }
-.login-form button {
+.login-form button[type=submit], .login-form button:not([type]) {
   background:#326149;
   min-height:48px;
 }
@@ -1423,7 +1423,7 @@ button:disabled {
 .login-student .login-story-copy > p,.login-student .login-feature,.login-student .login-story-footer {
   color:var(--theme-muted, #85739d);
 }
-.login-student .brand-symbol,.login-student .login-form button {
+.login-student .brand-symbol,.login-student .login-form button[type=submit],.login-student .login-form button:not([type]) {
   background:#7965b1;
 }
 .login-student .eyebrow {
@@ -1473,3 +1473,10 @@ button:disabled {
 
 /* Keep all settings reachable on shorter desktop windows. */
 @media(min-width:1001px) { .teacher-navigation { overflow-y:auto; } .sidebar-note { margin-top:24px; } }
+
+.auth-methods { display:flex; gap:6px; background:var(--theme-soft, #f1eef7); padding:5px; border-radius:10px; }
+.auth-methods button { flex:1; min-height:42px; border-radius:7px; font-size:13px; color:var(--theme-muted, #62556f); }
+.auth-methods button[aria-pressed=true] { background:var(--theme-surface, white); color:var(--theme-violet-text, #604b8c); font-weight:650; }
+.login-form .auth-text-button { display:block; width:100%; min-height:44px; background:transparent; color:var(--theme-violet-text, #604b8c); font-size:14px; }
+.auth-text-button:hover { text-decoration:underline; }
+.auth-notice { padding:14px; border-radius:10px; background:var(--theme-green-soft, #e8f1e7); color:var(--theme-green-text, #28583e); font-size:13px; line-height:1.7; }

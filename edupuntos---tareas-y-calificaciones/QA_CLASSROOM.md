@@ -59,7 +59,7 @@ El recorrido queda automatizado en `tests/browser/classroom.spec.ts`. Genera cap
 ## Lo que falta comprobar con personas reales
 
 1. **Servicio publicado:** crear Supabase, aplicar ambas migraciones y comprobar autenticación, fotos privadas y sincronización desde Netlify. La prueba simulada no valida credenciales, cuotas ni configuración del proyecto real.
-2. **Preparación del aula:** cargar estudiantes reales y asignar sus cuentas. La matrícula y la recuperación de contraseña aún requieren un administrador; no hay interfaz de grupos/clases separados.
+2. **Preparación del aula:** el [registro de alumnos](STUDENT_ACCOUNTS.md) permite crear fichas nuevas con nombres, apellidos, DNI y correo. La vinculación de fichas anteriores y la recuperación de contraseña requieren un administrador; no hay interfaz de grupos/clases separados.
 3. **Teléfonos reales:** probar cámara y galería en Android y iPhone, orientación de fotos y legibilidad del cuaderno. Se acepta una imagen JPG/PNG/WebP de hasta 5 MB por tarea; PDF, HEIC y entregas de varias páginas necesitan una decisión de producto.
 4. **Conexión irregular:** el reintento conserva la foto mientras el formulario sigue abierto. No hay guardado persistente sin conexión; cerrar o recargar puede perder el borrador.
 5. **Uso cotidiano:** observar si los alumnos distinguen pendiente, enviada y calificada; si el profesor encuentra todas las entregas; y si los mensajes y botones se entienden sin ayuda. También conviene sustituir los avisos nativos del profesor por confirmaciones visibles dentro de la página.

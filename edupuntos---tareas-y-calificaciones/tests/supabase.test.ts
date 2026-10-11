@@ -14,9 +14,9 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
   // This tests SQL/RLS, not the hosted Auth, Storage HTTP or Realtime services.
   const db = new PGlite(); t.after(() => db.close());
   await db.exec(`
-    create role anon nologin; create role authenticated nologin;
+    create role anon nologin; create role authenticated nologin; create role service_role nologin;
     create schema auth; create schema storage;
-    create table auth.users(id uuid primary key, email text);
+    create table auth.users(id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz);
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     grant usage on schema auth, public, storage to anon, authenticated;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -33,9 +33,11 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
   const comparisonMigration = readFileSync(new URL('../supabase/migrations/003_photo_grade_comparison.sql', import.meta.url), 'utf8');
   await db.exec(comparisonMigration);
   await db.exec(comparisonMigration);
+  const registrationMigration = readFileSync(new URL('../supabase/migrations/004_student_registration.sql', import.meta.url), 'utf8');
+  await db.exec(registrationMigration); await db.exec(registrationMigration);
   await db.exec(readFileSync(new URL('../supabase/demo.sql', import.meta.url),'utf8'));
   for (const [id,email] of [[teacher,'teacher@test.invalid'],[student,'one@test.invalid'],[other,'two@test.invalid'],[outsider,'unassigned@test.invalid']]) {
-    await db.query('insert into auth.users values($1,$2)',[id,email]);
+    await db.query('insert into auth.users(id,email) values($1,$2)',[id,email]);
   }
   await db.query("insert into public.edu_profiles values($1,'teacher',null),($2,'student','est-1'),($3,'student','est-2')",[teacher,student,other]);
   async function as(id: string, role = 'authenticated') {
@@ -138,6 +140,38 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
     await as(teacher); await db.query("select public.edu_delete_assignment('asg-1')");
     assert.equal((await state()).submissions.length,0); assert.equal((await state()).grades.length,0);
     assert.equal((await state()).assignments.length,2);
+  });
+  await t.test('student registration confirms email, ignores forged roles and keeps DNI private', async () => {
+    await db.exec('reset role');
+    const id = '20000000-0000-4000-8000-000000000001';
+    const metadata = { signup_kind:'student', first_name:'Ana María', last_name:'Prueba', dni:'00123456', role:'teacher', student_id:'est-1' };
+    await db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3)',[id,'ana@example.invalid',metadata]);
+    assert.equal((await db.query('select * from public.edu_profiles where user_id=$1',[id])).rows.length,0);
+    await as(id); await assert.rejects(state(),/perfil asignado/);
+    await assert.rejects(db.query('select * from public.edu_student_accounts'),/permission denied/);
+    await assert.rejects(db.query("select public.edu_login_email('00123456',repeat('a',64))"),/permission denied/);
+    await db.exec('reset role');
+    await assert.rejects(db.query('insert into auth.users(id,email,raw_user_meta_data) values(gen_random_uuid(),$1,$2)',['duplicate@example.invalid',metadata]),/unique constraint/);
+    await assert.rejects(db.query('insert into auth.users(id,email,raw_user_meta_data) values(gen_random_uuid(),$1,$2)',['bad@example.invalid',{...metadata,dni:'bad'}]),/check constraint/);
+    await db.query('update auth.users set email_confirmed_at=now() where id=$1',[id]);
+    await as(id);
+    const profile = (await db.query<{profile:any}>('select public.edu_current_user() as profile')).rows[0].profile;
+    assert.equal(profile.role,'student'); assert.equal(profile.studentId,`est-${id}`);
+    const own = await state(); assert.equal(own.students[0].name,'Ana María Prueba');
+    assert.equal(JSON.stringify(own).includes('00123456'),false);
+    assert.equal(JSON.stringify(own).includes('ana@example.invalid'),false);
+    await assert.rejects(db.query("select public.edu_set_rewards('Uno','Dos','Tres')"),/permiso/);
+    await db.exec('reset role');
+    await db.query('update auth.users set raw_user_meta_data=$2,email_confirmed_at=now() where id=$1',[id,{...metadata,dni:'87654321',role:'teacher'}]);
+    assert.equal((await db.query<{dni:string}>('select dni from public.edu_student_accounts where user_id=$1',[id])).rows[0].dni,'00123456');
+    await as(teacher); await assert.rejects(db.query('select * from public.edu_student_accounts'),/permission denied/);
+    await as('', 'anon'); await assert.rejects(db.query("select public.edu_login_email('00123456',repeat('a',64))"),/permission denied/);
+    await as('', 'service_role');
+    for(let i=0;i<10;i++) {
+      const result = (await db.query<{result:any}>("select public.edu_login_email('00123456',repeat('a',64)) as result")).rows[0].result;
+      assert.deepEqual(result,{allowed:true,email:'ana@example.invalid'});
+    }
+    assert.deepEqual((await db.query<{result:any}>("select public.edu_login_email('00123456',repeat('b',64)) as result")).rows[0].result,{allowed:false,email:null});
   });
 });
 

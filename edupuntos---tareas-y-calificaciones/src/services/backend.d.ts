@@ -1,6 +1,7 @@
 declare module '#backend' {
   export const currentUser: typeof import('./supabase-api').currentUser;
   export const login: typeof import('./supabase-api').login;
+  export const register: typeof import('./supabase-api').register;
   export const logout: typeof import('./supabase-api').logout;
   export const fetchState: typeof import('./supabase-api').fetchState;
   export const submitHomework: typeof import('./supabase-api').submitHomework;

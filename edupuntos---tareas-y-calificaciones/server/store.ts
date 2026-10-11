@@ -29,6 +29,10 @@ export class Store {
         student_id TEXT REFERENCES students(id), CHECK((role='student') = (student_id IS NOT NULL)));
       CREATE TABLE IF NOT EXISTS sessions (
         token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS student_accounts (
+        user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        dni TEXT NOT NULL UNIQUE CHECK(length(dni)=8 AND dni NOT GLOB '*[^0-9]*'),
+        first_name TEXT NOT NULL, last_name TEXT NOT NULL);
       CREATE TRIGGER IF NOT EXISTS revoke_changed_account_sessions
       AFTER UPDATE OF role, student_id, password_hash ON users
       WHEN NEW.role IS NOT OLD.role OR NEW.student_id IS NOT OLD.student_id OR NEW.password_hash IS NOT OLD.password_hash

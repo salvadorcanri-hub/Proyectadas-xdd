@@ -15,7 +15,7 @@ Cada aplicación tiene su entrada, servidor y compilación. No existe un selecto
 
 ## Apariencia
 
-En **Configuración → Apariencia** se puede elegir **Sistema (automático)**, **Claro** u **Oscuro**. Por defecto se sigue el sistema y sus cambios en tiempo real. El ajuste está disponible en la portada, el acceso y ambos espacios. Se guarda en el navegador y se sincroniza entre las pestañas del mismo sitio; los puertos de desarrollo separados tienen preferencias independientes. Si el navegador bloquea el almacenamiento, la elección funciona durante esa página. No requiere cambios en Supabase.
+Después de iniciar sesión, en **Configuración → Apariencia** se puede elegir **Sistema (automático)**, **Claro** u **Oscuro**. Por defecto se sigue el sistema y sus cambios en tiempo real. La portada, el acceso y el registro respetan la preferencia guardada, pero no muestran Configuración. Se guarda en el navegador y se sincroniza entre las pestañas del mismo sitio; los puertos de desarrollo separados tienen preferencias independientes. Si el navegador bloquea el almacenamiento, la elección funciona durante esa página.
 
 El script compartido `public/appearance.js` se carga antes de los estilos para aplicar la preferencia guardada desde el inicio, con la política de seguridad existente. `public/appearance.css` define la paleta común; `src/index.css` y las variantes `dark:` adaptan los componentes. Las fotos conservan sus colores originales.
 
@@ -31,7 +31,7 @@ En el entorno de Codex, Bun está en `/workspace/cloud-tools/node_modules/.bin/b
 
 ## Cuentas
 
-No hay contraseñas predeterminadas ni registro público. Un administrador con acceso al servidor crea las cuentas con estos comandos; cada uno solicita una contraseña de 12 a 128 caracteres sin mostrarla:
+Los alumnos pueden registrarse con nombres, apellidos, DNI y correo e iniciar sesión con DNI o correo. Consulta [cómo activar y comprobar las cuentas en Netlify + Supabase](STUDENT_ACCOUNTS.md). Las cuentas docentes se asignan administrativamente. No hay contraseñas predeterminadas. En modo local, un administrador también puede crear cuentas con estos comandos; cada uno solicita una contraseña de 12 a 128 caracteres sin mostrarla:
 
 ```sh
 npm run user:create -- --username profesor --role teacher
