@@ -1,3 +1,4 @@
+import { ConnectionNotice } from './ConnectionNotice';
 import { useEffect, useRef, type ReactNode } from 'react';
 
 /** The native dialog keeps keyboard focus inside and makes the page behind it inert. */
@@ -30,6 +31,7 @@ export function Modal({ children, labelledBy, onClose, busy = false }: {
       }
     }}
     onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
+    <ConnectionNotice authenticated insideDialog/>
     {children}
   </dialog>;
 }

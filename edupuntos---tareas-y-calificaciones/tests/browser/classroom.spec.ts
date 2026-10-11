@@ -108,13 +108,13 @@ test('classroom journey: three students, interrupted upload, feedback, resubmiss
       await dialog.getByLabel('Comentario al profesor:').fill('Camila: explicación de la receta familiar');
       await mobile.route('**/api/student/submissions', route => route.abort('internetdisconnected'));
       await dialog.getByRole('button', { name: 'Confirmar Entrega' }).click();
-      await expect(dialog.getByRole('alert')).toContainText('Comprueba tu conexión');
+      await expect(dialog.getByRole('alert')).toContainText('No pudimos confirmar el envío');
       await expect(dialog.getByLabel('Comentario al profesor:')).toHaveValue('Camila: explicación de la receta familiar');
       await expect(dialog.getByAltText('Preview')).toBeVisible();
       await mobile.unroute('**/api/student/submissions');
       let release!: () => void;
       const pending = new Promise<void>(resolve => { release = resolve; });
-      await mobile.route('**/api/student/submissions', async route => { await pending; await route.continue(); });
+      await mobile.route('**/api/student/submissions', async route => { await pending; const response = await route.fetch(); expect(response.ok()).toBe(true); await route.abort('failed'); });
       try {
         await dialog.getByRole('button', { name: 'Confirmar Entrega' }).click();
         await expect(dialog.getByRole('button', { name: 'Enviando...' })).toBeDisabled();

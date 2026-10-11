@@ -155,3 +155,7 @@ No uses un disco efímero para datos reales: las notas, cuentas y fotografías d
 ## Seguridad
 
 Consulta [la revisión de seguridad y sus pruebas](SECURITY_REVIEW.md). Las importaciones aceptan `.xlsx` y `.csv` en UTF-8; convierte los `.xls` antiguos antes de subirlos. Para Supabase aplica todas las migraciones de `supabase/migrations/` en orden.
+
+### Conexión y revisión de uso real
+
+La app avisa de desconexión, solicitudes lentas y datos que no se pudieron actualizar. Permite reintentar lecturas y distingue un guardado confirmado de una respuesta perdida; no reenvía escrituras automáticamente. La revisión funcional, las limitaciones actuales y el orden de mejoras están en [REAL_WORLD_REVIEW.md](REAL_WORLD_REVIEW.md).

@@ -1,14 +1,10 @@
+import { monitoredFetch, dataUpdated, dataStale, realtimeStatus } from './connection';
 import { AppState, GradeType, RewardsConfig, PhotoReading } from '../types';
 import { validateRegistration, type StudentRegistration } from '../utils/registration';
 
 export const API_BASE = `/api/${__APP_ROLE__}`;
 export async function request(endpoint: string, options: RequestInit = {}) {
-  let res: Response;
-  try {
-    res = await fetch(API_BASE + endpoint, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-EduPuntos-Client': __APP_ROLE__, ...options.headers } });
-  } catch {
-    throw new Error('No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.');
-  }
+  const res = await monitoredFetch(API_BASE + endpoint, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-EduPuntos-Client': __APP_ROLE__, ...options.headers } });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401 && !endpoint.startsWith('/auth/')) window.dispatchEvent(new Event('session-expired'));
@@ -17,9 +13,25 @@ export async function request(endpoint: string, options: RequestInit = {}) {
   return data;
 }
 
-export async function fetchState(): Promise<AppState> { return (await request('/state')).state; }
+export async function fetchState(): Promise<AppState> { const result = (await request('/state')).state; dataUpdated(); return result; }
 export async function submitHomework(assignmentId: string, studentId: string, photoUrl: string, comment?: string, photoReading?: PhotoReading | null): Promise<AppState> {
-  return (await request('/submissions', { method: 'POST', body: JSON.stringify({ assignmentId, studentId, photoUrl, comment, photoReading }) })).state;
+  try { return (await request('/submissions', { method: 'POST', body: JSON.stringify({ assignmentId, studentId, photoUrl, comment, photoReading }) })).state; }
+  catch (error) {
+    if ((error as { code?: string }).code !== 'UNCONFIRMED') throw error;
+    try {
+      const saved = await fetchState();
+      const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(photoUrl);
+      if (match) {
+        const bytes = Uint8Array.from(atob(match[2]), character => character.charCodeAt(0));
+        const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).map(byte => byte.toString(16).padStart(2, '0')).join('');
+        const expectedPath = `${API_BASE}/files/${hash}.${match[1]}`;
+        if (saved.submissions.some(s => s.assignmentId === assignmentId && s.studentId === studentId && s.photoUrl === expectedPath && s.comment === (comment || '').trim()
+          && (s.photoReading?.status ?? null) === (photoReading?.status ?? null) && (s.photoReading?.grade ?? null) === (photoReading?.grade ?? null) && (s.photoReading?.confidence ?? null) === (photoReading?.confidence ?? null))) return saved;
+      }
+    } catch { /* No automatic write retry after an ambiguous response. */ }
+    dataStale();
+    throw new Error('No pudimos confirmar el envío. Puede haberse guardado. Actualiza los datos y revisa tu entrega antes de volver a enviarla.');
+  }
 }
 export async function updateGrade(assignmentId: string, studentId: string, grade: GradeType, feedback?: string): Promise<AppState> {
   return (await request('/grades', { method: 'POST', body: JSON.stringify({ assignmentId, studentId, grade, feedback }) })).state;
@@ -40,12 +52,25 @@ export async function updateRewardsConfig(rewards: RewardsConfig): Promise<AppSt
 export function subscribeToRealtimeUpdates(onUpdate: (state: AppState) => void): () => void {
   const events = new EventSource(API_BASE + '/events');
   let stopped = false;
-  events.onmessage = event => { const payload = JSON.parse(event.data); if (payload.state) onUpdate(payload.state); };
-  events.onerror = () => {
-    // EventSource reconnects itself; check whether authentication has expired.
-    void request('/state').then(data => { if (!stopped) onUpdate(data.state); }).catch(() => {});
+  let refreshing = false;
+  const refresh = async () => {
+    if (stopped || refreshing) return;
+    refreshing = true;
+    try { const state = await fetchState(); if (!stopped) onUpdate(state); }
+    catch { if (!stopped) dataStale(); }
+    finally { refreshing = false; }
   };
-  return () => { stopped = true; events.close(); };
+  events.onopen = () => { if (!stopped) realtimeStatus(true); };
+  events.onmessage = event => {
+    if (stopped) return;
+    try { const payload = JSON.parse(event.data); if (payload.state) { dataUpdated(); onUpdate(payload.state); } }
+    catch { dataStale(); }
+  };
+  events.onerror = () => { if (!stopped) { realtimeStatus(false); void refresh(); } };
+  const retry = () => { void refresh(); };
+  const timer = window.setInterval(() => { if (document.visibilityState === 'visible') retry(); }, 60000);
+  window.addEventListener('online', retry); window.addEventListener('edupuntos-refresh', retry);
+  return () => { stopped = true; events.close(); clearInterval(timer); window.removeEventListener('online', retry); window.removeEventListener('edupuntos-refresh', retry); };
 }
 
 export async function currentUser() { return (await request('/auth/me')).user; }

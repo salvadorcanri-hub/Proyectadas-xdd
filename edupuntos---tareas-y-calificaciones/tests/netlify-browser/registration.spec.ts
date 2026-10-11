@@ -76,5 +76,30 @@ test('Netlify registration, email confirmation, DNI/email login and role checks 
   role='teacher';
   await page.getByRole('button',{name:'Entrar',exact:true}).click();
   await expect(page.getByRole('button',{name:'Cerrar sesión'})).toBeVisible();
+  // A background Supabase failure must be visible, and manual refresh must recover.
+  let stateUnavailable = true;
+  await page.route('**/rest/v1/rpc/edu_state', route => stateUnavailable
+    ? route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"Service unavailable"}' })
+    : route.fallback());
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByText(/No pudimos actualizar los datos/)).toBeVisible();
+  stateUnavailable = false;
+  await page.getByRole('button', { name: 'Actualizar datos' }).click();
+  await expect(page.getByText(/No pudimos actualizar los datos/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible();
+  // The server can confirm a write while the subsequent screen refresh fails.
+  let created = 0;
+  const dialogs: string[] = [];
+  page.on('dialog', async dialog => { dialogs.push(dialog.message()); await dialog.accept(); });
+  await page.route('**/rest/v1/rpc/edu_create_assignment', route => {
+    created++; stateUnavailable = true;
+    return route.fulfill({ contentType: 'application/json', body: 'null' });
+  });
+  await page.getByRole('button', { name: 'Tareas', exact: true }).click();
+  await page.getByPlaceholder('Ej: Problemas de Porcentajes').fill('Guardada con respuesta de lectura fallida');
+  await page.getByRole('button', { name: 'Publicar Tarea', exact: true }).click();
+  await expect.poll(() => dialogs.join(' ')).toContain('El cambio se guardó');
+  expect(created).toBe(1);
+  await expect(page.getByText(/No pudimos actualizar los datos/)).toBeVisible();
   expect(errors).toEqual([]);
 });

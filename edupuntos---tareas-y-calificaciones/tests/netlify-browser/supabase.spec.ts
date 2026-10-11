@@ -5,7 +5,7 @@ import { workbookBuffer, readWorkbook } from '../workbook-helpers';
 import { readFileSync } from 'node:fs';
 import { markedPhoto } from '../photo-fixture';
 
-test('Netlify bundles: separate Supabase logins, uploads, grading and Excel (mocked HTTP boundary)', async ({ browser }) => {
+test('Netlify bundles: separate Supabase logins, lost upload response recovery, grading and Excel (mocked HTTP boundary)', async ({ browser }) => {
   const state = seedState(); state.submissions=[]; state.grades=[]; state.students.forEach(s=>s.avatar='');
   const users = {
     'teacher@test.invalid': { id:'10000000-0000-4000-8000-000000000001', username:'teacher@test.invalid', role:'teacher', studentId:null },
@@ -14,7 +14,7 @@ test('Netlify bundles: separate Supabase logins, uploads, grading and Excel (moc
   const context = await browser.newContext();
   const unexpected: string[] = [];
   const errors: string[] = [];
-  let uploads = 0; let signedRequests = 0;
+  let submissions = 0; let uploads = 0; let signedRequests = 0;
   const sockets: any[] = [];
   await context.routeWebSocket('wss://test-project.supabase.co/**', ws => {
     ws.onMessage(message => {
@@ -56,8 +56,9 @@ test('Netlify bundles: separate Supabase logins, uploads, grading and Excel (moc
       return reply(body.paths.map((p:string)=>({path:p,signedURL:`/object/sign/edupuntos-homework/${p}?token=test-only`,error:null})));
     }
     if(name==='edu_submit') {
+      submissions++;
       state.submissions.push({id:'submitted',studentId:user.studentId!,assignmentId:body.p_assignment_id,photoUrl:body.p_photo_path,submittedAt:new Date().toISOString(),comment:body.p_comment,photoReading:body.p_photo_reading});
-      notify(); return reply(null);
+      notify(); return route.abort('failed');
     }
     if(name==='edu_set_grade') {
       state.grades.push({studentId:body.p_student_id,assignmentId:body.p_assignment_id,grade:body.p_grade,feedback:body.p_feedback,updatedAt:new Date().toISOString()});
@@ -88,7 +89,7 @@ test('Netlify bundles: separate Supabase logins, uploads, grading and Excel (moc
   await expect(student.getByRole('status')).toHaveText('Nota detectada en la foto: AD', {timeout:35000});
   await student.getByRole('button',{name:'Confirmar Entrega',exact:true}).click();
   await expect(student.getByRole('heading',{name:/Subir Foto:/})).toHaveCount(0);
-  expect(uploads).toBe(1); expect(signedRequests).toBeGreaterThan(0);
+  expect(uploads).toBe(1); expect(submissions).toBe(1); expect(signedRequests).toBeGreaterThan(0);
   await expect(student.getByText('Espera la próxima actualización', {exact:true})).toBeVisible();
   await teacher.getByRole('button',{name:'Planilla Rápida'}).click();
   const row = teacher.getByRole('row').filter({hasText:'Camila Mendoza'});

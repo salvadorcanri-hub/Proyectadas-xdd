@@ -1480,3 +1480,14 @@ button:disabled {
 .login-form .auth-text-button { display:block; width:100%; min-height:44px; background:transparent; color:var(--theme-violet-text, #604b8c); font-size:14px; }
 .auth-text-button:hover { text-decoration:underline; }
 .auth-notice { padding:14px; border-radius:10px; background:var(--theme-green-soft, #e8f1e7); color:var(--theme-green-text, #28583e); font-size:13px; line-height:1.7; }
+
+.connection-notice { position: sticky; top: 0; z-index: 60; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .75rem; padding: .8rem 1rem; background: #fff5d6; color: #65420d; border-bottom: 1px solid #dbc47b; font-size: .875rem; }
+.connection-notice small { display: block; margin-top: .25rem; }
+.connection-notice button { border: 1px solid currentColor; border-radius: .5rem; padding: .4rem .7rem; font-weight: 600; }
+.connection-notice button:disabled { opacity: .6; }
+[data-theme='dark'] .connection-notice { background: #332c19; color: #f5dda0; border-color: #71603a; }
+
+.teacher-navigation, .student-navigation { top: var(--connection-banner-height, 0px); }
+.app-dialog[open] { flex-direction: column; gap: .5rem; }
+.app-dialog > .connection-notice { position: static; flex-shrink: 0; max-width: 48rem; border-radius: .5rem; }
+.app-dialog > :not(.connection-notice) { min-height: 0; }
