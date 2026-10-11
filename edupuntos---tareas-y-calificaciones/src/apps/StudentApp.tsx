@@ -2,7 +2,7 @@ import { HomeworkPhoto } from '../components/HomeworkPhoto';
 import { AppNavigation } from '../components/AppNavigation';
 import { ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Camera,
@@ -18,6 +18,7 @@ import { AppState, Assignment } from '../types';
 import { calculateStudentScores, getGradeLabel } from '../utils/scoreCalculator';
 import { submitHomework } from '../services/api';
 import { PhotoLightbox } from '../components/PhotoLightbox';
+import { Modal } from '../components/Modal';
 
 interface StudentAppProps {
   state: AppState;
@@ -43,6 +44,8 @@ export const StudentApp: React.FC<StudentAppProps> = ({
   const [studentComment, setStudentComment] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string>('');
+  const photoReader = useRef<FileReader | null>(null);
+  useEffect(() => () => { photoReader.current?.abort(); photoReader.current = null; }, [uploadModalAsg?.id]);
 
   const [lightboxData, setLightboxData] = useState<{
     url: string;
@@ -53,6 +56,9 @@ export const StudentApp: React.FC<StudentAppProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    photoReader.current?.abort();
+    photoReader.current = null;
+    setPhotoPreview('');
 
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
       setUploadError('Selecciona una imagen JPG, PNG o WebP de hasta 5 MB.');
@@ -61,8 +67,9 @@ export const StudentApp: React.FC<StudentAppProps> = ({
 
     setUploadError('');
     const reader = new FileReader();
+    photoReader.current = reader;
     reader.onload = () => {
-      setPhotoPreview(reader.result as string);
+      if (photoReader.current === reader) setPhotoPreview(reader.result as string);
     };
     reader.onerror = () => setUploadError('No se pudo leer la imagen.');
     reader.readAsDataURL(file);
@@ -247,7 +254,13 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                     </div>
 
                     <div className="p-4 flex-1 space-y-3">
-                      <p className="text-xs text-slate-600 line-clamp-3">{asg.description}</p>
+                      {asg.description && <div className="text-xs text-slate-600">
+                        <p className="line-clamp-3">{asg.description}</p>
+                        <details className="mt-2">
+                          <summary className="cursor-pointer font-semibold text-indigo-700">Leer instrucciones completas</summary>
+                          <p className="mt-2 whitespace-pre-wrap break-words">{asg.description}</p>
+                        </details>
+                      </div>}
 
                       {submission && (
                         <div className="pt-2">
@@ -545,18 +558,20 @@ export const StudentApp: React.FC<StudentAppProps> = ({
 
       {/* UPLOAD MODAL */}
       {uploadModalAsg && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+        <Modal labelledBy="upload-title" busy={isSubmitting} onClose={() => setUploadModalAsg(null)}>
           <div className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
               <div>
                 <span className="text-[11px] font-semibold uppercase text-indigo-700">
                   {uploadModalAsg.subject}
                 </span>
-                <h3 className="text-base font-bold text-slate-900">
+                <h3 id="upload-title" className="text-base font-bold text-slate-900">
                   Subir Foto: {uploadModalAsg.title}
                 </h3>
               </div>
               <button
+                aria-label="Cerrar envío de foto"
+                disabled={isSubmitting}
                 onClick={() => setUploadModalAsg(null)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-semibold p-1"
               >
@@ -565,6 +580,12 @@ export const StudentApp: React.FC<StudentAppProps> = ({
             </div>
 
             <div className="p-5 overflow-y-auto space-y-4">
+              {state.grades.some(g => g.assignmentId === uploadModalAsg.id && g.studentId === currentStudent.id && g.grade) && (
+                <p role="status" className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
+                  Al confirmar una nueva entrega, se quitarán tu nota y tus puntos de esta tarea hasta que el profesor vuelva a revisarla.
+                </p>
+              )}
+              {uploadModalAsg.description && <p className="text-xs text-slate-600 whitespace-pre-wrap break-words">{uploadModalAsg.description}</p>}
               <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-4 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors">
                 <Camera className="w-8 h-8 text-indigo-600 mb-2" />
                 <span className="text-xs font-semibold text-slate-800">
@@ -572,10 +593,11 @@ export const StudentApp: React.FC<StudentAppProps> = ({
                 </span>
                 <input
                   type="file"
+                  disabled={isSubmitting}
                   accept="image/png,image/jpeg,image/webp"
                   capture="environment"
                   onChange={handleFileChange}
-                  className="hidden"
+                  className="sr-only"
                 />
               </label>
 
@@ -587,10 +609,13 @@ export const StudentApp: React.FC<StudentAppProps> = ({
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="student-comment" className="block text-xs font-semibold text-slate-700 mb-1">
                   Comentario al profesor:
                 </label>
                 <textarea
+                  id="student-comment"
+                  disabled={isSubmitting}
+                  maxLength={2000}
                   rows={2}
                   value={studentComment}
                   onChange={(e) => setStudentComment(e.target.value)}
@@ -600,7 +625,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
               </div>
 
               {uploadError && (
-                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
+                <div role="alert" className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
                   {uploadError}
                 </div>
               )}
@@ -610,6 +635,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
               <button
                 type="button"
                 onClick={() => setUploadModalAsg(null)}
+                disabled={isSubmitting}
                 className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800"
               >
                 Cancelar
@@ -624,7 +650,7 @@ export const StudentApp: React.FC<StudentAppProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Lightbox */}

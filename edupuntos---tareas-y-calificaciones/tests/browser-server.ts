@@ -8,6 +8,8 @@ const data = mkdtempSync(path.join(tmpdir(), 'edupuntos-browser-'));
 const store = new Store(data);
 createUser(store, 'test-teacher', 'Browser-test-only-123', 'teacher');
 createUser(store, 'test-student', 'Browser-test-only-123', 'student', 'est-1');
+createUser(store, 'test-student-2', 'Browser-test-only-123', 'student', 'est-2');
+createUser(store, 'test-student-3', 'Browser-test-only-123', 'student', 'est-3');
 store.close();
 const child = spawn('node', process.env.SERVE_HOSTED ? ['scripts/hosted.mjs', 'start'] : [process.env.SERVE_BUILT ? 'tests/serve-built.mjs' : 'scripts/dev.mjs'], { stdio:'inherit', env:{...process.env, DATA_DIR:data, PORT:'3100', API_TARGET:'http://127.0.0.1:3100', TEACHER_PORT:'3101', STUDENT_PORT:'3102'} });
 for (const signal of ['SIGTERM','SIGINT'] as const) process.on(signal, () => child.kill(signal));

@@ -2,6 +2,8 @@
 
 **Opción para empezar con planes gratuitos: [Netlify + Supabase](SUPABASE_NETLIFY.md).** Sigue esa guía para publicar las dos apps sin el servidor de Render. El resto de este documento describe el modo local Express/SQLite y la alternativa de Render.
 
+Consulta también el [informe de pruebas de uso en un aula](QA_CLASSROOM.md), con los recorridos comprobados, las incidencias corregidas y lo que falta validar con usuarios reales.
+
 Dos aplicaciones web independientes conectadas a una API común:
 
 - **Docentes**: tareas, revisión de fotos, calificaciones, Excel y premios.

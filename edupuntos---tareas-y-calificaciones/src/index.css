@@ -1223,6 +1223,33 @@ button:disabled {
     min-width:0;
   }
 }
+
+.app-dialog {
+  position:fixed;
+  inset:0;
+  margin:0;
+  width:100%;
+  height:100dvh;
+  max-width:none;
+  max-height:none;
+  padding:16px;
+  border:0;
+  background:transparent;
+  color:inherit;
+}
+.app-dialog[open] {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.app-dialog::backdrop {
+  background:rgb(0 0 0 / 65%);
+  backdrop-filter:blur(2px);
+}
+.app-dialog label:focus-within {
+  outline:2px solid #6366f1;
+  outline-offset:3px;
+}
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after {
     scroll-behavior:auto!important;

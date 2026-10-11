@@ -72,11 +72,10 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
   const [isCreatingAsg, setIsCreatingAsg] = useState(false);
 
   // Rewards form state
-  const [rewardsForm, setRewardsForm] = useState<RewardsConfig>({ ...state.rewards });
+  const [rewardsDraft, setRewardsDraft] = useState<Partial<RewardsConfig>>({});
+  const rewardsForm = { ...state.rewards, ...rewardsDraft };
   const [isSavingRewards, setIsSavingRewards] = useState(false);
   const [rewardsSavedMsg, setRewardsSavedMsg] = useState(false);
-
-  useEffect(() => { setRewardsForm({ ...state.rewards }); }, [state.rewards]);
 
   // Grade update
   const handleSetGrade = async (
@@ -86,9 +85,18 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
     feedback?: string
   ) => {
     try {
-      const fb = feedback !== undefined ? feedback : feedbackInputs[`${assignmentId}_${studentId}`];
+      const key = `${assignmentId}_${studentId}`;
+      const fb = feedback !== undefined ? feedback : feedbackInputs[key];
       const updatedState = await updateGrade(assignmentId, studentId, grade, fb);
       onStateUpdate(updatedState);
+      // Once saved, follow server feedback (including a cleared grade on resubmission).
+      // Keep any newer edit the teacher typed while this request was in flight.
+      setFeedbackInputs(previous => {
+        if (!Object.hasOwn(previous, key) || previous[key] !== fb) return previous;
+        const next = { ...previous };
+        delete next[key];
+        return next;
+      });
       confetti({ particleCount: 20, spread: 40 });
     } catch (err: any) {
       alert('Error al calificar: ' + err.message);
@@ -211,6 +219,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
     try {
       const updated = await updateRewardsConfig(rewardsForm);
       onStateUpdate(updated);
+      setRewardsDraft({});
       setRewardsSavedMsg(true);
       setTimeout(() => setRewardsSavedMsg(false), 3000);
     } catch (err: any) {
@@ -685,6 +694,8 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                         <input
                           type="text"
                           placeholder="Retroalimentación al estudiante..."
+                          aria-label={`Comentario para ${student.name}`}
+                          maxLength={2000}
                           value={feedbackInputs[inputKey] ?? (gradeRec?.feedback || '')}
                           onChange={(e) =>
                             setFeedbackInputs((prev) => ({ ...prev, [inputKey]: e.target.value }))
@@ -975,7 +986,8 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                   type="text"
                   required
                   value={rewardsForm.firstPlace}
-                  onChange={(e) => setRewardsForm({ ...rewardsForm, firstPlace: e.target.value })}
+                  disabled={isSavingRewards}
+                  onChange={(e) => { setRewardsDraft({ ...rewardsDraft, firstPlace: e.target.value }); setRewardsSavedMsg(false); }}
                   className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg text-slate-900"
                 />
               </div>
@@ -988,7 +1000,8 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                   type="text"
                   required
                   value={rewardsForm.secondPlace}
-                  onChange={(e) => setRewardsForm({ ...rewardsForm, secondPlace: e.target.value })}
+                  disabled={isSavingRewards}
+                  onChange={(e) => { setRewardsDraft({ ...rewardsDraft, secondPlace: e.target.value }); setRewardsSavedMsg(false); }}
                   className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg text-slate-900"
                 />
               </div>
@@ -1001,7 +1014,8 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                   type="text"
                   required
                   value={rewardsForm.thirdPlace}
-                  onChange={(e) => setRewardsForm({ ...rewardsForm, thirdPlace: e.target.value })}
+                  disabled={isSavingRewards}
+                  onChange={(e) => { setRewardsDraft({ ...rewardsDraft, thirdPlace: e.target.value }); setRewardsSavedMsg(false); }}
                   className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-lg text-slate-900"
                 />
               </div>
@@ -1012,6 +1026,8 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                   <span>¡Premios actualizados y reflejados en tiempo real para todos los estudiantes!</span>
                 </div>
               )}
+
+              {Object.keys(rewardsDraft).length > 0 && <p role="status" className="text-xs text-amber-800">Tienes cambios sin publicar. Pulsa Guardar y Publicar Premios cuando termines.</p>}
 
               <button
                 type="submit"

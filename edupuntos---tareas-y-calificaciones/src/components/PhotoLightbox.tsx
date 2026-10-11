@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
+import { Modal } from './Modal';
 
 interface PhotoLightboxProps {
   photoUrl: string;
@@ -26,12 +27,12 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
   const handleRotate = () => setRotation((r) => (r + 90) % 360);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs p-4">
+    <Modal labelledBy="photo-title" onClose={onClose}>
       <div className="relative flex flex-col w-full max-w-4xl max-h-[90vh] bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 text-white">
+        <div className="flex flex-wrap gap-3 items-center justify-between px-5 py-3 border-b border-slate-800 text-white">
           <div>
-            <h3 className="text-base font-semibold text-slate-100">{title}</h3>
+            <h3 id="photo-title" className="text-base font-semibold text-slate-100">{title}</h3>
             {studentName && (
               <p className="text-xs text-slate-400">
                 Estudiante: {studentName} {submittedAt ? `· ${new Date(submittedAt).toLocaleDateString()}` : ''}
@@ -71,7 +72,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
         </div>
 
         {/* Content Image */}
-        <div className="relative flex-1 overflow-auto flex items-center justify-center p-4 min-h-[350px] bg-slate-950">
+        <div className="relative flex-1 overflow-auto flex items-center justify-center p-4 min-h-0 bg-slate-950">
           <img
             src={photoUrl}
             alt={title}
@@ -92,6 +93,6 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 };

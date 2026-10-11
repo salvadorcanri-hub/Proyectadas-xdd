@@ -2,7 +2,12 @@ import { AppState, GradeType, RewardsConfig } from '../types';
 
 export const API_BASE = `/api/${__APP_ROLE__}`;
 export async function request(endpoint: string, options: RequestInit = {}) {
-  const res = await fetch(API_BASE + endpoint, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-EduPuntos-Client': __APP_ROLE__, ...options.headers } });
+  let res: Response;
+  try {
+    res = await fetch(API_BASE + endpoint, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-EduPuntos-Client': __APP_ROLE__, ...options.headers } });
+  } catch {
+    throw new Error('No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401 && !endpoint.startsWith('/auth/')) window.dispatchEvent(new Event('session-expired'));
