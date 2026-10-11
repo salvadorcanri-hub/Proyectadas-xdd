@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
   if (mode !== 'teacher' && mode !== 'student') throw new Error('Usa npm run dev:teacher o npm run dev:student.');
   return {
     root: path.join(root, 'apps', mode),
+    publicDir: path.join(root, 'public'),
     base: (process.env.HOSTED_WEB === '1' || process.env.EDUPUNTOS_BACKEND === 'supabase') ? (mode === 'teacher' ? '/docentes/' : '/alumnos/') : '/',
     plugins: [react(), tailwindcss(), ...(mode === 'student' ? [ocrAssets()] : [])],
     define: { __APP_ROLE__: JSON.stringify(mode), __BACKEND__: JSON.stringify(process.env.EDUPUNTOS_BACKEND === 'supabase' ? 'supabase' : 'local') },

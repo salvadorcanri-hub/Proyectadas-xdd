@@ -1,0 +1,9 @@
+body { font-family: system-ui, sans-serif; margin: 0; background: var(--theme-canvas, #f1f5f9); color: var(--theme-text, #0f172a); min-height: 100dvh; display: grid; place-items: center; }
+main { width: min(100%, 540px); padding: 32px; box-sizing: border-box; }
+h1 { font-size: 40px; }
+p { line-height: 1.6; color: var(--theme-muted, #475569); }
+nav { display: grid; gap: 16px; margin-top: 32px; }
+a { padding: 24px; background: var(--theme-surface, white); border: 1px solid var(--theme-border, #cbd5e1); border-radius: 16px; color: var(--theme-violet-text, #4338ca); text-decoration: none; font-size: 20px; font-weight: 600; }
+a:hover { border-color: var(--theme-violet-text, #4338ca); }
+:focus-visible { outline: 3px solid #8c79da; outline-offset: 4px; }
+small { display: block; font-size: 14px; font-weight: 400; color: var(--theme-muted, #475569); margin-top: 8px; }

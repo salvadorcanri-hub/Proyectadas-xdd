@@ -1,0 +1,37 @@
+:root { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --theme-canvas: #11171d;
+  --theme-surface: #1b242c;
+  --theme-soft: #25313b;
+  --theme-border: #3b4a56;
+  --theme-text: #ecf0f4;
+  --theme-muted: #b4c1cd;
+  --theme-green-soft: #21382f;
+  --theme-green-text: #abd2b7;
+  --theme-violet-soft: #322b46;
+  --theme-violet-text: #d0bee9;
+  --theme-gold-soft: #3e3423;
+  --theme-gold-text: #ead09a;
+  --theme-blue-soft: #23374a;
+  --theme-blue-text: #b1d4ee;
+}
+.appearance-settings { color: var(--theme-text, #273c32); }
+.appearance-settings h2 { font-size: 20px; font-weight: 650; margin: 0 0 18px; }
+.appearance-settings label { display: block; font-size: 14px; font-weight: 600; }
+.appearance-settings select {
+  display: block; width: 100%; min-height: 46px; margin-top: 10px;
+  padding: 10px 12px; border: 1px solid var(--theme-border, #cbd5e1);
+  border-radius: 9px; background: var(--theme-soft, #f6f7f4);
+  color: var(--theme-text, #273c32); font: inherit;
+}
+.appearance-settings p { font-size: 13px; line-height: 1.7; color: var(--theme-muted, #52635a); margin: 12px 0 0; }
+.appearance-details { margin-top: 24px; }
+.appearance-details summary { cursor: pointer; font-size: 14px; padding-block: 10px; color: var(--theme-muted, #52635a); }
+.appearance-details .appearance-settings { margin-top: 12px; }
+.settings-panel { width: min(100%, 460px); max-height: 100%; overflow: auto; padding: 26px; border-radius: 16px; background: var(--theme-surface, #fff); border: 1px solid var(--theme-border, #e3e8e1); }
+.settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.settings-heading h1 { font-size: 23px; font-weight: 650; }
+.settings-close { display: grid; place-items: center; min-width: 44px; min-height: 44px; border-radius: 8px; }
+.settings-close:hover { background: var(--theme-soft, #f3f6f1); }
+.login-content { width: 100%; max-width: 370px; }

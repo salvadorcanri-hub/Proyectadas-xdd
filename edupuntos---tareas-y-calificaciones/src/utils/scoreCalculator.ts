@@ -75,40 +75,40 @@ export function getGradeLabel(grade: 'AD' | 'A' | 'B' | 'C' | null | undefined):
         code: 'AD',
         points: 10,
         label: 'Logro Destacado',
-        badgeClass: 'text-emerald-700 bg-emerald-50 border border-emerald-200',
-        bgLight: 'bg-emerald-50',
+        badgeClass: 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800',
+        bgLight: 'bg-emerald-50 dark:bg-emerald-950',
       };
     case 'A':
       return {
         code: 'A',
         points: 8,
         label: 'Logro Esperado',
-        badgeClass: 'text-blue-700 bg-blue-50 border border-blue-200',
-        bgLight: 'bg-blue-50',
+        badgeClass: 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800',
+        bgLight: 'bg-blue-50 dark:bg-blue-950',
       };
     case 'B':
       return {
         code: 'B',
         points: 6,
         label: 'En Proceso',
-        badgeClass: 'text-amber-700 bg-amber-50 border border-amber-200',
-        bgLight: 'bg-amber-50',
+        badgeClass: 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800',
+        bgLight: 'bg-amber-50 dark:bg-amber-950',
       };
     case 'C':
       return {
         code: 'C',
         points: 4,
         label: 'En Inicio',
-        badgeClass: 'text-rose-700 bg-rose-50 border border-rose-200',
-        bgLight: 'bg-rose-50',
+        badgeClass: 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800',
+        bgLight: 'bg-rose-50 dark:bg-rose-950',
       };
     default:
       return {
         code: '-',
         points: 0,
         label: 'Sin Calificar',
-        badgeClass: 'text-slate-400 bg-slate-50 border border-slate-200',
-        bgLight: 'bg-slate-50',
+        badgeClass: 'text-slate-400 bg-slate-50 dark:bg-soft border border-slate-200 dark:border-slate-700',
+        bgLight: 'bg-slate-50 dark:bg-soft',
       };
   }
 }

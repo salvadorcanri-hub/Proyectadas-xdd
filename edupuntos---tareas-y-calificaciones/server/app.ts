@@ -1,3 +1,4 @@
+import { landingPage } from '../scripts/landing-page.mjs';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
@@ -220,13 +221,10 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
         res.sendFile(path.join(directory, 'index.html'));
       });
     }
-    app.get('/', (_req, res) => res.type('html').send(`<!doctype html>
-      <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EduPuntos</title>
-      <style>body{font-family:system-ui;margin:0;background:#f1f5f9;color:#0f172a;min-height:100vh;display:grid;place-items:center}main{max-width:600px;padding:32px}h1{font-size:40px}p{line-height:1.6;color:#475569}nav{display:grid;gap:16px;margin-top:32px}a{padding:24px;background:white;border:1px solid #cbd5e1;border-radius:16px;color:#4338ca;text-decoration:none;font-size:20px;font-weight:600}a:hover,a:focus{border-color:#4338ca;outline:2px solid #4338ca}small{display:block;font-size:14px;font-weight:400;color:#475569;margin-top:8px}</style></head>
-      <body><main><h1>EduPuntos</h1><p>Elige tu aplicación e inicia sesión con tu cuenta.</p><nav aria-label="Aplicaciones">
-      <a href="/docentes/">Profesores<small>Tareas, calificaciones y registro de Excel</small></a>
-      <a href="/alumnos/">Alumnos<small>Entregas, notas y progreso escolar</small></a>
-      </nav></main></body></html>`));
+    for (const file of ['appearance.js', 'appearance.css', 'landing.css']) {
+      app.get(`/${file}`, (_req, res) => res.sendFile(path.resolve(options.webRoot!, 'teacher', file)));
+    }
+    app.get('/', (_req, res) => res.type('html').send(landingPage));
   }
   app.use((_req, res) => res.status(404).json({ error: 'Ruta no encontrada.' }));
   app.use((error: Error & { status?: number; type?: string }, _req: Request, res: Response, _next: NextFunction) => {

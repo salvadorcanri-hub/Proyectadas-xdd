@@ -12,7 +12,7 @@ export function GradeVerification({ submission, officialGrade, teacher = false }
     matched: ['Coincide con Excel', 'La nota leída en la foto coincide con la nota del registro del profesor.'],
     mismatch: ['Las notas son diferentes', teacher ? 'Comprueba la nota escrita en el cuaderno y corrige Excel si corresponde.' : 'La nota leída en la foto es distinta a la del registro. Pide a tu profesor que revise la diferencia.'],
   }[status];
-  const tone = status === 'matched' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : status === 'mismatch' ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-amber-50 border-amber-200 text-amber-900';
+  const tone = status === 'matched' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200' : status === 'mismatch' ? 'bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200' : 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200';
   return <section aria-label="Comprobación de la nota" data-verification={status} className={`grade-verification rounded-lg border p-3 text-xs ${tone}`}>
     <strong className="block">{content[0]}</strong>
     <p className="mt-1">{content[1]}</p>

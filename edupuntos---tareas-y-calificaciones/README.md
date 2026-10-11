@@ -13,6 +13,12 @@ Dos aplicaciones web independientes conectadas a una API común:
 
 Cada aplicación tiene su entrada, servidor y compilación. No existe un selector para cambiar de rol ni para hacerse pasar por otro alumno. Las sesiones de ambas apps pueden coexistir en el mismo navegador.
 
+## Apariencia
+
+En **Configuración → Apariencia** se puede elegir **Sistema (automático)**, **Claro** u **Oscuro**. Por defecto se sigue el sistema y sus cambios en tiempo real. El ajuste está disponible en la portada, el acceso y ambos espacios. Se guarda en el navegador y se sincroniza entre las pestañas del mismo sitio; los puertos de desarrollo separados tienen preferencias independientes. Si el navegador bloquea el almacenamiento, la elección funciona durante esa página. No requiere cambios en Supabase.
+
+El script compartido `public/appearance.js` se carga antes de los estilos para aplicar la preferencia guardada desde el inicio, con la política de seguridad existente. `public/appearance.css` define la paleta común; `src/index.css` y las variantes `dark:` adaptan los componentes. Las fotos conservan sus colores originales.
+
 ## Requisitos e instalación
 
 Node.js **24 o posterior** y Bun **1.4.2**. Desde esta carpeta:

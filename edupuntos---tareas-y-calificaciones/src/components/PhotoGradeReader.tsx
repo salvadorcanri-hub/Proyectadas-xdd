@@ -35,7 +35,7 @@ export function PhotoGradeReader({ photo, disabled, onChange }: {
   };
   return <section aria-label="Lectura de la nota en la foto" className="space-y-2 text-xs">
     <p>Incluye la nota que tu profesor escribió en el cuaderno. Si no se lee bien, marca su zona sobre la imagen.</p>
-    <div className="relative select-none overflow-hidden rounded-lg border border-slate-300" style={{ touchAction: busy || disabled ? 'auto' : 'none' }}
+    <div className="relative select-none overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700" style={{ touchAction: busy || disabled ? 'auto' : 'none' }}
       onPointerDown={event => {
         if (busy || disabled) return;
         event.currentTarget.setPointerCapture(event.pointerId); start.current = position(event); setRegion(undefined);
@@ -71,9 +71,9 @@ export function PhotoGradeReader({ photo, disabled, onChange }: {
       : reading.status === 'unavailable' ? 'La lectura no está disponible. Puedes reintentarlo o guardar la foto pendiente de lectura.'
       : 'No se pudo leer la nota con claridad. Marca su zona o elige una foto más nítida. También puedes guardar la foto pendiente de lectura.'}</p>
     <div className="flex flex-wrap gap-2">
-      <button type="button" disabled={busy || disabled || !region || region.width < 0.02 || region.height < 0.02} onClick={() => void read(region)} className="px-3 py-2 rounded-lg border border-indigo-300 disabled:opacity-50">Leer zona marcada</button>
-      <button type="button" disabled={busy || disabled} onClick={() => { setRegion(undefined); void read(); }} className="px-3 py-2 rounded-lg border border-slate-300 disabled:opacity-50">Volver a leer foto completa</button>
-      {busy && <button type="button" onClick={() => controller.current?.abort()} className="px-3 py-2 rounded-lg border border-slate-300">Detener lectura</button>}
+      <button type="button" disabled={busy || disabled || !region || region.width < 0.02 || region.height < 0.02} onClick={() => void read(region)} className="px-3 py-2 rounded-lg border border-indigo-300 dark:border-indigo-800 disabled:opacity-50">Leer zona marcada</button>
+      <button type="button" disabled={busy || disabled} onClick={() => { setRegion(undefined); void read(); }} className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-50">Volver a leer foto completa</button>
+      {busy && <button type="button" onClick={() => controller.current?.abort()} className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700">Detener lectura</button>}
     </div>
   </section>;
 }
