@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -20,4 +20,14 @@ export function storePhoto(dataDir: string, value: unknown): string {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   if (!existsSync(path.join(dir, name))) writeFileSync(path.join(dir, name), buffer, { flag: 'wx', mode: 0o600 });
   return `/files/${name}`;
+}
+
+// Never delete a photo still referenced by another task or student.
+export function removeUnusedPhotos(dataDir: string, candidates: string[], submissions: { photoUrl: string }[]) {
+  const referenced = new Set(submissions.map(s => s.photoUrl));
+  for (const candidate of new Set(candidates)) {
+    if (!/^\/files\/[a-f0-9]{64}\.(png|jpeg|webp)$/.test(candidate) || referenced.has(candidate)) continue;
+    try { rmSync(path.join(dataDir, 'uploads', path.basename(candidate)), { force: true }); }
+    catch { console.error('No se pudo retirar una foto antigua del almacenamiento.'); }
+  }
 }

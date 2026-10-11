@@ -1,5 +1,6 @@
 import express from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { securityHeaders } from '../server/security';
+import httpProxy from 'http-proxy';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
@@ -9,7 +10,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'd
 if (!existsSync(path.join(root, 'index.html'))) throw new Error(`Compila primero: npm run build:${role}`);
 const app = express();
 app.disable('x-powered-by');
-app.use(createProxyMiddleware({ pathFilter: '/api', target: process.env.API_TARGET || 'http://127.0.0.1:3000', changeOrigin: true }));
+app.use(securityHeaders);
+const proxy = httpProxy.createProxyServer({ target: process.env.API_TARGET || 'http://127.0.0.1:3000', changeOrigin: true });
+app.use((req, res, next) => {
+  if (req.path === '/api' || req.path.startsWith('/api/')) proxy.web(req, res, {}, () => { if (!res.headersSent) res.status(502).json({ error: 'Servidor no disponible.' }); else res.end(); });
+  else next();
+});
 app.use(express.static(root));
 app.get('*', (_req, res) => res.sendFile(path.join(root, 'index.html')));
 const server = app.listen(Number(process.env.APP_PORT || (role === 'teacher' ? 3001 : 3002)), process.env.APP_HOST || '127.0.0.1', () => console.log(`EduPuntos ${role}: aplicación iniciada`));

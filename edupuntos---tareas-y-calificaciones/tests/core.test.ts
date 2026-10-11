@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as XLSX from 'xlsx';
+import { readWorkbook } from './workbook-helpers';
 import { Store } from '../server/store';
 import { seedState } from '../server/seed';
 import { exportWorkbook, importRows } from '../server/excel';
@@ -40,7 +40,7 @@ test('failed database writes roll back all grade changes', t => {
   next.grades[0].grade = 'C'; next.grades.push({ studentId: 'missing', assignmentId: 'asg-1', grade: 'A', updatedAt: '' });
   assert.throws(() => store.save(next)); assert.deepEqual(store.load(), original); store.close();
 });
-test('submitted but ungraded tasks are awaiting review; Excel uses exactly the same ranking', () => {
+test('submitted but ungraded tasks are awaiting review; Excel uses exactly the same ranking', async () => {
   const state = seedState(); state.grades = [
     { studentId:'est-2', assignmentId:'asg-1', grade:'A', updatedAt:'' },
     { studentId:'est-1', assignmentId:'asg-1', grade:'C', updatedAt:'' },
@@ -50,9 +50,8 @@ test('submitted but ungraded tasks are awaiting review; Excel uses exactly the s
   assert.equal(scores[0].student.id, 'est-1');
   const ungraded = scores.find(s => s.student.id === 'est-3')!;
   assert.equal(ungraded.gradesCount.awaitingReview, 1); assert.equal(ungraded.gradesCount.unsubmitted, 2);
-  const book = XLSX.read(exportWorkbook(state), { type:'buffer' });
-  const rows: any[] = XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]]);
-  for (const score of scores) assert.equal(rows.find(r => r['CÓDIGO'] === score.student.code)['PUESTO'], score.rank);
+  const [headers, ...rows] = await readWorkbook(await exportWorkbook(state));
+  for (const score of scores) assert.equal(rows.find(r => r[0] === score.student.code)![headers.indexOf('PUESTO')], score.rank);
 });
 test('Excel preserves blanks, allows explicit clearing, rejects unsafe mappings and invalid grades atomically', () => {
   const state = seedState(); const before = structuredClone(state);

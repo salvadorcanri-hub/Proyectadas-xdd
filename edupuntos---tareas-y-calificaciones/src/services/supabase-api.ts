@@ -32,7 +32,7 @@ export async function currentUser(): Promise<User> {
   if (error) throw failure(error);
   if (!session) throw Object.assign(new Error('Inicia sesión para continuar.'), { status: 401 });
   const user = await rpc<User>('edu_current_user');
-  if (user.role !== __APP_ROLE__) throw new Error(`Esta cuenta no tiene acceso a la aplicación de ${__APP_ROLE__ === 'teacher' ? 'profesores' : 'alumnos'}.`);
+  if (user.role !== __APP_ROLE__) throw Object.assign(new Error(`Esta cuenta no tiene acceso a la aplicación de ${__APP_ROLE__ === 'teacher' ? 'profesores' : 'alumnos'}.`), { code: '42501' });
   return user;
 }
 export async function login(email: string, password: string) {
@@ -52,11 +52,11 @@ export async function fetchState(): Promise<AppState> {
   const paths = [...new Set(state.submissions.map(s => s.photoUrl))];
   const needed = paths.filter(p => !signed.has(p) || signed.get(p)!.until < Date.now());
   if (needed.length) {
-    const { data, error } = await client().storage.from(bucket).createSignedUrls(needed, 3600);
+    const { data, error } = await client().storage.from(bucket).createSignedUrls(needed, 300);
     if (error) throw failure(error);
     for (const photo of data || []) {
       if (photo.error || !photo.signedUrl || !photo.path) throw new Error('No se pudo acceder a una fotografía. Contacta al administrador.');
-      signed.set(photo.path, { url: photo.signedUrl, until: Date.now() + 45 * 60 * 1000 });
+      signed.set(photo.path, { url: photo.signedUrl, until: Date.now() + 4 * 60 * 1000 });
     }
   }
   for (const path of signed.keys()) if (!paths.includes(path)) signed.delete(path);
@@ -97,13 +97,15 @@ export async function updateRewardsConfig(rewards: RewardsConfig): Promise<AppSt
 }
 export async function importExcelBase64(fileBase64: string) {
   const { importRows, workbookRows } = await import('./excel');
-  const { changes } = importRows(await fetchState(), workbookRows(fileBase64));
+  const { changes } = importRows(await fetchState(), await workbookRows(fileBase64));
   const count = await rpc<number>('edu_import_grades', { p_changes: changes });
   return { state: await fetchState(), message: `Se actualizaron ${count} calificaciones.`, updatedCount: count };
 }
 export async function downloadExcel() {
-  const [{ createWorkbook }, XLSX, state] = await Promise.all([import('./excel'), import('xlsx'), fetchState()]);
-  XLSX.writeFile(createWorkbook(state), 'EduPuntos_Registro_Notas.xlsx');
+  const [{ createWorkbook }, state] = await Promise.all([import('./excel'), fetchState()]);
+  const url = URL.createObjectURL(await createWorkbook(state));
+  const link = document.createElement('a'); link.href = url; link.download = 'EduPuntos_Registro_Notas.xlsx'; link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export function subscribeToRealtimeUpdates(onUpdate: (state: AppState) => void): () => void {
   const supabase = client();

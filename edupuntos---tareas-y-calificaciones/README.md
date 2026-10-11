@@ -140,3 +140,7 @@ El archivo `render.yaml` está en la **raíz del repositorio**. Define un servic
 El servidor nuevo comienza con el aula de demostración si su disco está vacío. Los datos del entorno actual no se transfieren con el código: para conservarlos, detén la API de origen, copia el directorio de datos completo por un canal privado al `DATA_DIR` de destino y arranca el servicio. No publiques esa copia en GitHub.
 
 No uses un disco efímero para datos reales: las notas, cuentas y fotografías deben sobrevivir a los reinicios y despliegues. Si prefieres otro proveedor, usa los mismos comandos de compilación y arranque, HTTPS y un volumen persistente para `DATA_DIR`.
+
+## Seguridad
+
+Consulta [la revisión de seguridad y sus pruebas](SECURITY_REVIEW.md). Las importaciones aceptan `.xlsx` y `.csv` en UTF-8; convierte los `.xls` antiguos antes de subirlos. Para Supabase aplica todas las migraciones de `supabase/migrations/` en orden.

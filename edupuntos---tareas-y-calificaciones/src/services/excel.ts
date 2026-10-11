@@ -1,10 +1,11 @@
-import * as XLSX from 'xlsx';
+import writeXlsxFile from 'write-excel-file/universal';
+export { workbookRows, readWorkbookBytes } from './excel-file';
 import type { AppState, GradeRecord, GradeType } from '../types';
 import { calculateStudentScores } from '../utils/scoreCalculator';
 
 const normalize = (value: unknown) => String(value ?? '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 
-export function createWorkbook(state: AppState): XLSX.WorkBook {
+export function createWorkbook(state: AppState): Promise<Blob> {
   const scores = calculateStudentScores(state);
   const headers = ['CÓDIGO', 'ESTUDIANTE', ...state.assignments.map(a => `${a.title} [${a.id}]`), 'PUNTOS TOTALES', 'PUESTO', 'RECOMPENSA TOP 3'];
   const rows = state.students.map(student => {
@@ -13,15 +14,16 @@ export function createWorkbook(state: AppState): XLSX.WorkBook {
     return [student.code, student.name, ...state.assignments.map(a => state.grades.find(g => g.studentId === student.id && g.assignmentId === a.id)?.grade ?? ''),
       score.totalPoints, score.rank, score.totalPoints > 0 && score.rank <= 3 ? rewards[score.rank - 1] : ''];
   });
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers, ...rows]), 'Registro de Notas EduPuntos');
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
-    ['GUÍA DE CALIFICACIONES'], ['AD', 10], ['A', 8], ['B', 6], ['C', 4],
-    ['Celda vacía', 'Conserva la nota existente.'], ['BORRAR', 'Elimina explícitamente la nota. No elimina la entrega.'],
-    ['Columnas', 'Conserve el CÓDIGO del estudiante y los identificadores [asg-…] de las tareas.'],
-    ['Validación', 'Si hay errores, no se aplica ninguna nota.'],
-  ]), 'Guía de Puntajes');
-  return workbook;
+  // Strings are always exported as literal cells, never formulas or hyperlinks.
+  return writeXlsxFile([
+    { sheet: 'Registro de Notas EduPuntos', data: [headers, ...rows] },
+    { sheet: 'Guía de Puntajes', data: [
+      ['GUÍA DE CALIFICACIONES'], ['AD', 10], ['A', 8], ['B', 6], ['C', 4],
+      ['Celda vacía', 'Conserva la nota existente.'], ['BORRAR', 'Elimina explícitamente la nota. No elimina la entrega.'],
+      ['Columnas', 'Conserve el CÓDIGO del estudiante y los identificadores [asg-…] de las tareas.'],
+      ['Validación', 'Si hay errores, no se aplica ninguna nota.'],
+    ] },
+  ]).toBlob();
 }
 
 // Validate the complete workbook before returning any changes. Blank cells are no-ops.
@@ -70,14 +72,4 @@ export function importRows(state: AppState, rows: unknown): { grades: GradeRecor
   }
   if (!count) throw new Error('Excel: no contiene notas para actualizar. Las celdas vacías conservan las notas.');
   return { grades, count, changes };
-}
-
-export function workbookRows(fileBase64: unknown): unknown[][] {
-  if (typeof fileBase64 !== 'string' || fileBase64.length > 8 * 1024 * 1024 || !/^[A-Za-z0-9+/]+={0,2}$/.test(fileBase64)) throw new Error('Archivo Excel inválido o demasiado grande (máximo 5 MB).');
-  const buffer = Uint8Array.from(atob(fileBase64), c => c.charCodeAt(0));
-  if (buffer.length > 5 * 1024 * 1024) throw new Error('El archivo Excel supera 5 MB.');
-  const workbook = XLSX.read(buffer, { type: 'array', sheetRows: 10002 });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  if (!sheet) throw new Error('El libro no contiene hojas.');
-  return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 }

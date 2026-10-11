@@ -38,8 +38,15 @@ test('independent apps: student submits, teacher grades, both receive live updat
   const card = student.locator('div').filter({has:student.getByRole('heading',{name:'Tarea de integración',exact:true})}).filter({has:student.getByRole('button',{name:/Subir|Enviar/})}).last();
   await card.getByRole('button',{name:/Subir|Enviar/}).click();
   await student.locator('input[type=file]').setInputFiles({name:'tarea.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64')});
+  const hostileComment = '<img src=x onerror=window.__commentXss=true>';
+  await student.locator('textarea').fill(hostileComment);
   await student.getByRole('button',{name:'Confirmar Entrega',exact:true}).click();
   await expect(student.getByRole('button',{name:'Confirmar Entrega',exact:true})).toHaveCount(0);
+  await teacher.getByRole('navigation').getByRole('button',{name:/Revisar Fotos/}).click();
+  const reviewId = await teacher.getByRole('option',{name:/Tarea de integración/}).getAttribute('value');
+  await teacher.getByLabel('Filtrar por Tarea:').selectOption(reviewId!);
+  await expect(teacher.getByText(hostileComment)).toBeVisible();
+  expect(await teacher.evaluate(() => (window as any).__commentXss)).toBeUndefined();
   await teacher.getByRole('button',{name:'Planilla Rápida'}).click();
   const row = teacher.getByRole('row').filter({hasText:'Camila Mendoza'});
   const grade = row.locator('select').last();

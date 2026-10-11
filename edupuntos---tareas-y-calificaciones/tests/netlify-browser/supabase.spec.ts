@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { seedState } from '../../server/seed';
 import { calculateStudentScores } from '../../src/utils/scoreCalculator';
-import * as XLSX from 'xlsx';
+import { workbookBuffer, readWorkbook } from '../workbook-helpers';
 import { readFileSync } from 'node:fs';
 
 test('Netlify bundles: separate Supabase logins, uploads, grading and Excel (mocked HTTP boundary)', async ({ browser }) => {
@@ -97,14 +97,21 @@ test('Netlify bundles: separate Supabase logins, uploads, grading and Excel (moc
   const downloaded = teacher.waitForEvent('download');
   await teacher.getByRole('button',{name:'Descargar .XLSX'}).click();
   const download = await downloaded;
-  const book = XLSX.read(readFileSync((await download.path())!),{type:'buffer'});
-  const sheet = book.Sheets[book.SheetNames[0]]; sheet.C2={t:'s',v:'B'};
-  await teacher.locator('input[type=file]').setInputFiles({name:'notas.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:XLSX.write(book,{type:'buffer',bookType:'xlsx'})});
+  const sheet = await readWorkbook(readFileSync((await download.path())!));
+  sheet[1][2] = 'B';
+  await teacher.locator('input[type=file]').setInputFiles({name:'notas.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:await workbookBuffer(sheet)});
   await teacher.getByRole('button',{name:'Confirmar y Guardar Notas'}).click();
   await expect(student.getByText('Nota B',{exact:true})).toBeVisible();
   await student.getByRole('button',{name:'Cerrar sesión'}).click();
   await expect(student.getByRole('button',{name:'Entrar',exact:true})).toBeVisible();
   await teacher.reload(); await expect(teacher.getByRole('button',{name:'Cerrar sesión'})).toBeVisible();
+  // Compiled pages must enforce the CSP generated for this project.
+  const violation = teacher.evaluate(() => new Promise<string>(resolve => {
+    document.addEventListener('securitypolicyviolation', event => resolve(event.violatedDirective), { once: true });
+    const script = document.createElement('script'); script.textContent = 'window.__edupuntosInjected = true'; document.body.append(script);
+  }));
+  expect(await violation).toBe('script-src-elem');
+  expect(await teacher.evaluate(() => (window as any).__edupuntosInjected)).toBeUndefined();
   expect(unexpected).toEqual([]); expect(errors).toEqual([]);
   await context.close();
 });

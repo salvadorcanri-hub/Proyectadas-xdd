@@ -14,7 +14,7 @@ Cada proyecto de Supabase equivale a un aula/institución compartida: todos sus 
 ## 2. Crear las tablas, funciones y permisos
 
 1. Dentro de Supabase abre **SQL Editor → New query**.
-2. Copia el contenido completo de `supabase/migrations/001_edupuntos.sql`, pégalo y pulsa **Run**.
+2. Ejecuta los archivos de `supabase/migrations/` en orden: primero `001_edupuntos.sql` y después `002_photo_authorization.sql`. Copia cada archivo completo, pégalo y pulsa **Run**. Si ya ejecutaste el primero, ejecuta solo el segundo; no vuelvas a aplicar `001` después de `002`.
 3. Para empezar con ocho estudiantes y tres tareas de ejemplo, ejecuta también `supabase/demo.sql`. Este paso es opcional, no crea cuentas, notas ni fotos y no sustituye datos existentes.
 
 El primer SQL crea las tablas `edu_*`, un bucket **privado** `edupuntos-homework`, las políticas RLS y las funciones de la aplicación. También incorpora `edu_changes` a la publicación `supabase_realtime`, si existe. Comprueba en la configuración de Realtime/replicación que `edu_changes` está habilitada; solo transmite un contador de cambios, nunca fotos o comentarios. La app también vuelve a consultar cada minuto como respaldo.
@@ -27,6 +27,8 @@ No hagas público el bucket y no desactives RLS para resolver errores. Los profe
 2. Si no quieres inscripciones públicas, deshabilita el registro de nuevos usuarios en la configuración de Authentication. Registrarse por sí solo nunca concede acceso al aula.
 3. Abre `supabase/profiles.example.sql`, sustituye los dos correos por los que acabas de crear y ejecútalo en SQL Editor.
 4. El profesor recibe rol `teacher`. El alumno queda vinculado a `est-1` (Camila, si cargaste la demostración). Para añadir más alumnos, crea sus cuentas y asígnales identificadores distintos, como `est-2`, `est-3`, etc.
+
+La segunda migración protege las fotografías si se cambia el alumno asociado a una cuenta.
 
 El rol se guarda en `edu_profiles`, no en metadatos que pueda modificar el usuario. Una cuenta sin perfil asignado no puede entrar a los datos. Las cuentas de la versión SQLite anterior **no se transfieren**; crea las cuentas nuevas en Supabase Auth. La recuperación de contraseñas en la interfaz no está implementada: el administrador debe gestionarla desde Supabase.
 
@@ -68,9 +70,9 @@ En Supabase configura la **Site URL** de Authentication con la dirección HTTPS 
 3. Crea una tarea desde docentes y comprueba que aparece en alumnos.
 4. Sube una foto PNG, JPEG o WebP de hasta 5 MB desde alumnos.
 5. Califícala desde docentes y verifica que la nota aparece en la libreta del alumno.
-6. Descarga la plantilla Excel, modifica una nota y vuelve a importarla. Las celdas vacías conservan notas; `BORRAR` elimina una nota explícitamente. Los cambios del archivo se validan y guardan en una sola transacción.
+6. Descarga la plantilla Excel, modifica una nota y vuelve a importarla. Se aceptan `.xlsx` y `.csv` en UTF-8; guarda los `.xls` antiguos como `.xlsx`. Las celdas vacías conservan notas; `BORRAR` elimina una nota explícitamente. Los cambios del archivo se validan y guardan en una sola transacción.
 
-Las fotografías se sirven con enlaces firmados que caducan a la hora. Como cualquier enlace firmado, quien lo reciba puede usarlo hasta su caducidad; no lo compartas. Las fotos reemplazadas quedan en el almacenamiento hasta su limpieza administrativa: vigila la cuota del plan gratuito. Los roles y el ranking se calculan en la base de datos para que ambas apps y Excel coincidan.
+Las fotografías se sirven con enlaces firmados que caducan a los cinco minutos. Como cualquier enlace firmado, quien lo reciba puede usarlo hasta su caducidad; no lo compartas. Las fotos reemplazadas quedan en el almacenamiento hasta su limpieza administrativa: vigila la cuota del plan gratuito. Los roles y el ranking se calculan en la base de datos para que ambas apps y Excel coincidan.
 
 ## Datos existentes y límites de esta adaptación
 

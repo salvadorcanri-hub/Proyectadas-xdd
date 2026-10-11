@@ -114,11 +114,8 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
     reader.onload = async (event) => {
       try {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const XLSX = await import('xlsx');
-        const workbook = XLSX.read(data, { type: 'array', sheetRows: 10002 });
-        const firstSheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[firstSheetName];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+        const { readWorkbookBytes } = await import('../services/excel-file');
+        const rows = await readWorkbookBytes(data);
 
         let binary = '';
         for (let i = 0; i < data.byteLength; i++) {
@@ -292,7 +289,7 @@ export const TeacherApp: React.FC<TeacherAppProps> = ({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".xlsx, .xls, .csv"
+                      accept=".xlsx, .csv"
                       onChange={handleExcelFileSelect}
                       className="hidden"
                     />

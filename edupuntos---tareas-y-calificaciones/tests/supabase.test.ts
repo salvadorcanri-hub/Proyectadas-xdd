@@ -27,6 +27,9 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
   const migration = readFileSync(new URL('../supabase/migrations/001_edupuntos.sql', import.meta.url),'utf8');
   await db.exec(migration);
   await db.exec(migration); // Reapplying cannot erase classroom data or loosen policies.
+  const photoMigration = readFileSync(new URL('../supabase/migrations/002_photo_authorization.sql', import.meta.url), 'utf8');
+  await db.exec(photoMigration);
+  await db.exec(photoMigration);
   await db.exec(readFileSync(new URL('../supabase/demo.sql', import.meta.url),'utf8'));
   for (const [id,email] of [[teacher,'teacher@test.invalid'],[student,'one@test.invalid'],[other,'two@test.invalid'],[outsider,'unassigned@test.invalid']]) {
     await db.query('insert into auth.users values($1,$2)',[id,email]);
@@ -70,6 +73,19 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
     await assert.rejects(db.query("select public.edu_submit('asg-1',$1,'')",[`${student}/photo.png`]),/no te pertenece/);
     assert.equal((await state()).submissions.length,0);
     await as(teacher); assert.equal((await db.query('select * from storage.objects')).rows.length,1);
+  });
+  await t.test('reassigned students cannot read or delete homework still belonging to their previous student profile', async () => {
+    await db.exec('reset role');
+    await db.query("update public.edu_profiles set student_id='est-3' where user_id=$1", [student]);
+    await as(student);
+    try {
+      assert.equal((await db.query('select * from storage.objects')).rows.length, 0, 'Old-profile photos remained readable');
+      assert.equal((await db.query('delete from storage.objects returning id')).rows.length, 0, 'RLS hid the reference and allowed its photo to be deleted');
+      await assert.rejects(db.query("select public.edu_submit('asg-2',$1,'')", [`${student}/photo.png`]), /no te pertenece/);
+    } finally {
+      await db.exec('reset role');
+      await db.query("update public.edu_profiles set student_id='est-1' where user_id=$1", [student]);
+    }
   });
   await t.test('teacher grading changes the revision and private feedback is visible only to its student',async () => {
     await as(teacher);

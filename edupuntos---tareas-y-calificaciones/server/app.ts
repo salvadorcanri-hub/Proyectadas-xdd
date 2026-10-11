@@ -5,7 +5,8 @@ import { randomUUID } from 'node:crypto';
 import { Store } from './store';
 import { authenticate, createSession, sessionUser, tokenHash, SESSION_MS } from './auth';
 import { exportWorkbook, importRows, workbookRows } from './excel';
-import { storePhoto } from './photos';
+import { storePhoto, removeUnusedPhotos } from './photos';
+import { securityHeaders } from './security';
 import { calculateStudentScores } from '../src/utils/scoreCalculator';
 import type { AppState, User } from '../src/types';
 
@@ -19,6 +20,7 @@ const text = (value: unknown, name: string, max: number, optional = false) => {
 export function createApp(store: Store, options: { secureCookies?: boolean; webRoot?: string } = {}) {
   const app = express();
   app.disable('x-powered-by');
+  app.use(securityHeaders);
   const clients = new Set<{ res: Response; user: User; token: string }>();
   const attempts = new Map<string, { count: number; until: number }>();
   const cookieName = (role: string) => `edupuntos_${role}`;
@@ -39,8 +41,9 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
   };
   const notify = () => {
     for (const client of clients) {
-      if (!sessionUser(store, client.token, client.user.role)) { client.res.end(); clients.delete(client); continue; }
-      client.res.write(`data: ${JSON.stringify({ type: 'SYNC', state: project(client.user) })}\n\n`);
+      const current = sessionUser(store, client.token, client.user.role);
+      if (!current || current.studentId !== client.user.studentId) { client.res.end(); clients.delete(client); continue; }
+      if (!client.res.write(`data: ${JSON.stringify({ type: 'SYNC', state: project(current) })}\n\n`)) { client.res.end(); clients.delete(client); }
     }
   };
   const commit = (state: AppState) => { store.save(state); notify(); };
@@ -55,8 +58,7 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
     }
     next();
   });
-  app.use('/api', express.json({ limit: '8mb' }));
-  app.post('/api/:portal/auth/login', async (req, res, next) => {
+  app.post('/api/:portal/auth/login', express.json({ limit: '4kb' }), async (req, res, next) => {
     try {
       const username = text(req.body?.username, 'Usuario', 80);
       text(req.body?.password, 'Contraseña', 128);
@@ -86,6 +88,8 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
     res.locals.user = user;
     next();
   });
+  // Authenticate before accepting large photo/workbook bodies.
+  app.use('/api', express.json({ limit: '8mb' }));
   app.get('/api/:portal/auth/me', (_req, res) => res.json({ user: res.locals.user }));
   app.post('/api/:portal/auth/logout', (req, res) => {
     const token = cookieToken(req, res.locals.role);
@@ -96,6 +100,7 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
   });
   app.get('/api/:portal/state', (_req, res) => res.json({ success: true, state: project(res.locals.user) }));
   app.get('/api/:portal/events', (req, res) => {
+    if (clients.size >= 256 || [...clients].filter(c => c.user.id === res.locals.user.id).length >= 5) return res.status(429).json({ error: 'Demasiadas conexiones abiertas. Cierra otras pestañas.' });
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
@@ -103,7 +108,8 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
     clients.add(client);
     res.write(`data: ${JSON.stringify({ type: 'INIT', state: project(client.user) })}\n\n`);
     const heartbeat = setInterval(() => {
-      if (!sessionUser(store, client.token, client.user.role)) res.end();
+      const current = sessionUser(store, client.token, client.user.role);
+      if (!current || current.studentId !== client.user.studentId) res.end();
       else res.write(': heartbeat\n\n');
     }, 15000);
     res.on('close', () => { clearInterval(heartbeat); clients.delete(client); });
@@ -131,10 +137,12 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
     try { photoUrl = storePhoto(store.dataDir, req.body.photoUrl); } catch (e) { throw new HttpError(400, (e as Error).message); }
     const existing = state.submissions.find(s => s.assignmentId === assignmentId && s.studentId === user.studentId);
     const submission = { id: existing?.id || randomUUID(), assignmentId, studentId: user.studentId!, photoUrl, submittedAt: new Date().toISOString(), comment };
+    const previousPhoto = existing?.photoUrl;
     if (existing) Object.assign(existing, submission); else state.submissions.push(submission);
     // A replacement submission needs a new review; do not display the previous photo's grade as current.
     state.grades = state.grades.filter(g => g.assignmentId !== assignmentId || g.studentId !== user.studentId);
     commit(state);
+    removeUnusedPhotos(store.dataDir, previousPhoto ? [previousPhoto] : [], state.submissions);
     res.json({ success: true, state: project(user) });
   });
   app.post('/api/:portal/grades', teacher, (req, res) => {
@@ -161,27 +169,41 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
   app.delete('/api/:portal/assignments/:id', teacher, (req, res) => {
     const state = store.load(); const id = req.params.id;
     if (!state.assignments.some(a => a.id === id)) throw new HttpError(404, 'La tarea no existe.');
+    const removedPhotos = state.submissions.filter(s => s.assignmentId === id).map(s => s.photoUrl);
     state.assignments = state.assignments.filter(a => a.id !== id);
     state.submissions = state.submissions.filter(s => s.assignmentId !== id);
     state.grades = state.grades.filter(g => g.assignmentId !== id);
-    commit(state); res.json({ success: true, state: project(res.locals.user) });
+    commit(state);
+    removeUnusedPhotos(store.dataDir, removedPhotos, state.submissions);
+    res.json({ success: true, state: project(res.locals.user) });
   });
   app.post('/api/:portal/rewards', teacher, (req, res) => {
     const state = store.load();
     state.rewards = { firstPlace: text(req.body.firstPlace, 'Primer premio', 500), secondPlace: text(req.body.secondPlace, 'Segundo premio', 500), thirdPlace: text(req.body.thirdPlace, 'Tercer premio', 500) };
     commit(state); res.json({ success: true, state: project(res.locals.user) });
   });
-  app.get('/api/:portal/excel-export', teacher, (_req, res) => {
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="EduPuntos_Registro_Notas.xlsx"');
-    res.send(exportWorkbook(store.load()));
+  app.get('/api/:portal/excel-export', teacher, async (req, res, next) => {
+    try {
+      const file = await exportWorkbook(store.load());
+      if (!sessionUser(store, cookieToken(req, 'teacher'), 'teacher')) return res.status(401).json({ error: 'Inicia sesión de nuevo.' });
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="EduPuntos_Registro_Notas.xlsx"');
+      res.send(file);
+    } catch (error) { next(error); }
   });
-  app.post('/api/:portal/excel-import', teacher, (req, res) => {
-    const state = store.load();
-    let result: ReturnType<typeof importRows>;
-    try { result = importRows(state, workbookRows(req.body.fileBase64)); } catch (e) { throw new HttpError(400, (e as Error).message); }
-    state.grades = result.grades; commit(state);
-    res.json({ success: true, updatedGradesCount: result.count, state: project(res.locals.user), message: `Se actualizaron ${result.count} calificaciones.` });
+  app.post('/api/:portal/excel-import', teacher, async (req, res, next) => {
+    try {
+      let rows: unknown[][];
+      try { rows = await workbookRows(req.body.fileBase64); }
+      catch (error) { throw new HttpError(400, (error as Error).message); }
+      if (!sessionUser(store, cookieToken(req, 'teacher'), 'teacher')) return res.status(401).json({ error: 'Inicia sesión de nuevo.' });
+      const state = store.load();
+      let result: ReturnType<typeof importRows>;
+      try { result = importRows(state, rows); }
+      catch (error) { throw new HttpError(400, (error as Error).message); }
+      state.grades = result.grades; commit(state);
+      res.json({ success: true, updatedGradesCount: result.count, state: project(res.locals.user), message: `Se actualizaron ${result.count} calificaciones.` });
+    } catch (error) { next(error); }
   });
   if (options.webRoot) {
     for (const [route, role] of [['docentes', 'teacher'], ['alumnos', 'student']]) {
