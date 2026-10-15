@@ -1,6 +1,6 @@
 # EduPuntos
 
-**Opción para empezar con planes gratuitos: [Netlify + Supabase](SUPABASE_NETLIFY.md).** Sigue esa guía para publicar las dos apps sin el servidor de Render. El resto de este documento describe el modo local Express/SQLite y la alternativa de Render.
+**Opción para empezar con planes gratuitos: [Netlify + Supabase](SUPABASE_NETLIFY.md).** Sigue esa guía para publicar las dos apps sin el servidor de Render. El resto de este documento describe el modo local Express/SQLite.
 
 Consulta también el [informe de pruebas de uso en un aula](QA_CLASSROOM.md), con los recorridos comprobados, las incidencias corregidas y lo que falta validar con usuarios reales.
 
@@ -12,6 +12,8 @@ Dos aplicaciones web independientes conectadas a una API común:
 - **Alumnos**: entregas propias, notas, comentarios del docente y ranking del aula.
 
 Cada aplicación tiene su entrada, servidor y compilación. No existe un selector para cambiar de rol ni para hacerse pasar por otro alumno. Las sesiones de ambas apps pueden coexistir en el mismo navegador.
+
+Consulta la [guía del piloto de dos profesores y tres alumnos](PILOT_FIVE_USERS.md) y la [asignación de las 20 aulas](CLASSROOMS.md).
 
 ## Apariencia
 
@@ -34,7 +36,7 @@ En el entorno de Codex, Bun está en `/workspace/cloud-tools/node_modules/.bin/b
 Los alumnos pueden registrarse con nombres, apellidos, DNI y correo e iniciar sesión con DNI o correo. Consulta [cómo activar y comprobar las cuentas en Netlify + Supabase](STUDENT_ACCOUNTS.md). Las cuentas docentes se asignan administrativamente. No hay contraseñas predeterminadas. En modo local, un administrador también puede crear cuentas con estos comandos; cada uno solicita una contraseña de 12 a 128 caracteres sin mostrarla:
 
 ```sh
-npm run user:create -- --username profesor --role teacher
+npm run user:create -- --username profesor --role teacher --classrooms sec-1-a
 npm run user:create -- --username alumno01 --role student --student est-1
 ```
 
@@ -137,16 +139,6 @@ La compilación de esta modalidad queda en `dist/hosted/`, con las rutas de recu
 ```sh
 CHROMIUM_PATH=/usr/bin/chromium npm run test:hosted
 ```
-
-### Opción preparada: Render
-
-El archivo `render.yaml` está en la **raíz del repositorio**. Define un servicio Node.js y un disco persistente de 1 GB para SQLite y fotos. **El plan Starter y el disco son de pago**; revisa el precio en Render antes de confirmar. Este archivo por sí solo no crea servicios ni realiza cargos.
-
-1. Sube a GitHub todos los cambios del proyecto, incluidos `render.yaml`, `server/`, `scripts/`, `apps/`, `package.json` y `bun.lock`. Los cambios locales de Codex no aparecen en GitHub hasta que los publiques allí. No subas `data/`, `node_modules/` ni contraseñas.
-2. En Render, crea un **Blueprint** y conecta `salvadorcanri-hub/Proyectadas-xdd`. Render leerá `render.yaml`; revisa el plan y el disco antes de aceptar.
-3. Espera a que el servicio termine de compilar y alcance el estado disponible. Usa la dirección HTTPS que proporcione Render, no la dirección `github.io`.
-4. En la consola del servicio, dentro de la carpeta de la aplicación, crea las cuentas con `npm run user:create -- --username profesor --role teacher` y el comando equivalente para cada alumno. Introduce las contraseñas cuando el programa las solicite.
-5. Abre `/docentes/` o `/alumnos/` en el dominio de Render. La comprobación de disponibilidad está en `/api/health`.
 
 El servidor nuevo comienza con el aula de demostración si su disco está vacío. Los datos del entorno actual no se transfieren con el código: para conservarlos, detén la API de origen, copia el directorio de datos completo por un canal privado al `DATA_DIR` de destino y arranca el servicio. No publiques esa copia en GitHub.
 

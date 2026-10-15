@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { AppState } from '../src/types';
 import { seedState } from './seed';
+import { CLASSROOMS, validateClassroom } from '../src/utils/classrooms';
 import { storePhoto } from './photos';
 
 export class Store {
@@ -27,6 +28,8 @@ export class Store {
         id TEXT PRIMARY KEY, username TEXT NOT NULL COLLATE NOCASE UNIQUE,
         password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('teacher','student')),
         student_id TEXT REFERENCES students(id), CHECK((role='student') = (student_id IS NOT NULL)));
+      CREATE TABLE IF NOT EXISTS classrooms (id TEXT PRIMARY KEY, grade INTEGER NOT NULL CHECK(grade BETWEEN 1 AND 5), section TEXT NOT NULL CHECK(section IN ('A','B','C','D')), UNIQUE(grade,section));
+      CREATE TABLE IF NOT EXISTS teacher_classrooms (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, classroom_id TEXT NOT NULL REFERENCES classrooms(id), PRIMARY KEY(user_id,classroom_id));
       CREATE TABLE IF NOT EXISTS sessions (
         token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS student_accounts (
@@ -38,6 +41,7 @@ export class Store {
       WHEN NEW.role IS NOT OLD.role OR NEW.student_id IS NOT OLD.student_id OR NEW.password_hash IS NOT OLD.password_hash
       BEGIN DELETE FROM sessions WHERE user_id=OLD.id; END;
     `);
+    for (const classroom of CLASSROOMS) this.db.prepare('INSERT OR IGNORE INTO classrooms VALUES (?,?,?)').run(classroom.id, classroom.grade, classroom.section);
     if (!this.db.prepare("SELECT 1 FROM settings WHERE key='initialized'").get()) {
       const legacy = path.join(dataDir, 'db.json');
       // Parse failures abort startup; never silently replace existing school data with a demo.
@@ -58,6 +62,7 @@ export class Store {
   }
 
   save(state: AppState) {
+    for (const item of [...state.students, ...state.assignments]) if (item.classroomId != null) validateClassroom(item.classroomId);
     this.db.exec('BEGIN IMMEDIATE');
     try {
       const student = this.db.prepare('INSERT INTO students VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET code=excluded.code, payload=excluded.payload WHERE payload != excluded.payload');

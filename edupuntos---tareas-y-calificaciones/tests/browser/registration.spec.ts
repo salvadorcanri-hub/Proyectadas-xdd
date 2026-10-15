@@ -8,6 +8,7 @@ test('new student registers, signs out, and signs in with either DNI or email', 
   await page.goto(url);
   await expect(page.getByText('Configuración',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Crear cuenta de alumno',exact:true}).click();
+  await page.getByLabel('Grado y sección').selectOption('sec-1-a');
   await page.getByLabel('Nombres',{exact:true}).fill('Ana María');
   await page.getByLabel('Apellidos',{exact:true}).fill('Prueba Escolar');
   await page.getByLabel('DNI',{exact:true}).fill('00334455');

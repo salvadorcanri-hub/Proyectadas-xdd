@@ -12,7 +12,7 @@ import { createUser } from '../server/auth';
 test('connected apps enforce identity, sync changes, protect photos and persist school data', async t => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'edupuntos-api-'));
   const store = new Store(dir); const { app, close } = createApp(store, { secureCookies:false });
-  createUser(store, 'teacher-test', 'Only-for-test-123', 'teacher');
+  createUser(store, 'teacher-test', 'Only-for-test-123', 'teacher', undefined, ['sec-1-a']);
   createUser(store, 'student-one', 'Only-for-test-123', 'student', 'est-1');
   createUser(store, 'student-two', 'Only-for-test-123', 'student', 'est-2');
   const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');

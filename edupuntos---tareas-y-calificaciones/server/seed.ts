@@ -92,5 +92,5 @@ const initialGrades: GradeRecord[] = [
 
 
 export function seedState(): AppState {
- return structuredClone({ students: initialStudents, assignments: initialAssignments, submissions: initialSubmissions, grades: initialGrades, rewards: { firstPlace: 'Medalla de Oro Escolar', secondPlace: 'Medalla de Plata Escolar', thirdPlace: 'Medalla de Bronce Escolar' } });
+ return structuredClone({ students: initialStudents.map(student => ({ ...student, classroomId: 'sec-1-a' })), assignments: initialAssignments.map(assignment => ({ ...assignment, classroomId: 'sec-1-a' })), submissions: initialSubmissions, grades: initialGrades, rewards: { firstPlace: 'Medalla de Oro Escolar', secondPlace: 'Medalla de Plata Escolar', thirdPlace: 'Medalla de Bronce Escolar' } });
 }

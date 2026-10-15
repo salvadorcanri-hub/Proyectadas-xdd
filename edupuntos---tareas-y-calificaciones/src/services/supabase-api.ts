@@ -1,3 +1,4 @@
+import { selectedClassroom } from './classroom-selection';
 import { monitoredFetch, connectionErrorMessage, dataUpdated, dataStale, realtimeStatus } from './connection';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AppState, GradeType, RewardsConfig, User, PhotoReading } from '../types';
@@ -34,6 +35,7 @@ export async function currentUser(): Promise<User> {
   if (error) throw failure(error);
   if (!session) throw Object.assign(new Error('Inicia sesión para continuar.'), { status: 401 });
   const user = await rpc<User>('edu_current_user');
+  if (!Array.isArray(user.classrooms)) throw new Error('Falta activar las aulas. El administrador debe aplicar la migración 005.');
   if (user.role !== __APP_ROLE__) throw Object.assign(new Error(`Esta cuenta no tiene acceso a la aplicación de ${__APP_ROLE__ === 'teacher' ? 'profesores' : 'alumnos'}.`), { code: '42501' });
   return user;
 }
@@ -55,11 +57,11 @@ export async function register(input: StudentRegistration): Promise<{ confirmati
   if (__APP_ROLE__ !== 'student') throw new Error('Las cuentas docentes las asigna el administrador.');
   const data = validateRegistration(input);
   // Check the required migration before creating an Auth account without a student profile.
-  try { if (!await rpc<boolean>('edu_registration_available')) throw new Error(); }
+  try { if (!await rpc<boolean>('edu_classrooms_available')) throw new Error(); }
   catch (error) { throw new Error(connectionErrorMessage(error as Error) || 'El registro de alumnos todavía no está configurado. Contacta al administrador.'); }
   const { data: result, error } = await client().auth.signUp({ email: data.email, password: data.password, options: {
     emailRedirectTo: `${window.location.origin}/alumnos/`,
-    data: { signup_kind: 'student', first_name: data.firstName, last_name: data.lastName, dni: data.dni },
+    data: { signup_kind: 'student', classroom_id: data.classroomId, first_name: data.firstName, last_name: data.lastName, dni: data.dni },
   } });
   if (error) {
     const messages: Record<string, string> = {
@@ -80,24 +82,33 @@ export async function logout() {
   if (error) throw failure(error);
 }
 const signed = new Map<string, { url: string; until: number }>();
-export async function fetchState(): Promise<AppState> {
+export async function fetchState(classroomId = selectedClassroom()): Promise<AppState> {
   await currentUser();
-  const state = await rpc<AppState>('edu_state');
+  const state = await rpc<AppState>('edu_state', { p_classroom_id: classroomId });
   const paths = [...new Set(state.submissions.map(s => s.photoUrl))];
-  const needed = paths.filter(p => !signed.has(p) || signed.get(p)!.until < Date.now());
+  // Keep a snapshot: concurrent refreshes for different classrooms must not evict this response's URLs.
+  const urls = new Map<string, string>();
+  for (const [path, photo] of signed) {
+    if (photo.until < Date.now()) signed.delete(path);
+    else if (paths.includes(path)) urls.set(path, photo.url);
+  }
+  const needed = paths.filter(p => !urls.has(p));
   if (needed.length) {
     const { data, error } = await client().storage.from(bucket).createSignedUrls(needed, 300);
     if (error) throw failure(error);
     for (const photo of data || []) {
       if (photo.error || !photo.signedUrl || !photo.path) throw new Error('No se pudo acceder a una fotografía. Contacta al administrador.');
       signed.set(photo.path, { url: photo.signedUrl, until: Date.now() + 4 * 60 * 1000 });
+      urls.set(photo.path, photo.signedUrl);
     }
   }
-  for (const path of signed.keys()) if (!paths.includes(path)) signed.delete(path);
+  while (signed.size > 500) signed.delete(signed.keys().next().value!);
+  if (paths.some(path => !urls.has(path))) throw new Error('No se pudo acceder a una fotografía. Actualiza los datos.');
   dataUpdated();
-  return { ...state, submissions: state.submissions.map(s => ({ ...s, photoUrl: signed.get(s.photoUrl)!.url })) };
+  return { ...state, submissions: state.submissions.map(s => ({ ...s, photoUrl: urls.get(s.photoUrl)! })) };
 }
 export async function submitHomework(assignmentId: string, studentId: string, photoUrl: string, comment?: string, photoReading?: PhotoReading | null): Promise<AppState> {
+  const classroomId = selectedClassroom();
   const user = await currentUser();
   if (user.role !== 'student' || user.studentId !== studentId) throw new Error('No puedes entregar la tarea de otro estudiante.');
   const match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(photoUrl);
@@ -107,13 +118,13 @@ export async function submitHomework(assignmentId: string, studentId: string, ph
   const path = `${user.id}/${crypto.randomUUID()}.${match[1]}`;
   const { error } = await client().storage.from(bucket).upload(path, bytes, { contentType: `image/${match[1]}`, upsert: false });
   if (error) throw failure(error);
-  try { await rpc('edu_submit', { p_assignment_id: assignmentId, p_photo_path: path, p_comment: comment || '', p_photo_reading: photoReading || null }); }
+  try { await rpc('edu_submit', { p_classroom_id: classroomId, p_assignment_id: assignmentId, p_photo_path: path, p_comment: comment || '', p_photo_reading: photoReading || null }); }
   catch (error) {
     // A response can be lost after COMMIT. Read the exact stored photo path before reporting failure.
     if (connectionErrorMessage(error as Error) || !(error as { status?: number }).status || (error as { status?: number }).status! >= 500) {
       try {
-        const saved = await rpc<AppState>('edu_state');
-        if (saved.submissions.some(s => s.studentId === studentId && s.assignmentId === assignmentId && s.photoUrl === path)) return refreshAfterSave();
+        const saved = await rpc<AppState>('edu_state', { p_classroom_id: classroomId });
+        if (saved.submissions.some(s => s.studentId === studentId && s.assignmentId === assignmentId && s.photoUrl === path)) return refreshAfterSave(classroomId);
       } catch { /* The outcome remains unknown; never resubmit automatically. */ }
       dataStale();
       throw new Error('No pudimos confirmar el envío. Puede haberse guardado. Actualiza los datos y revisa tu entrega antes de volver a enviarla.');
@@ -122,10 +133,10 @@ export async function submitHomework(assignmentId: string, studentId: string, ph
     void client().storage.from(bucket).remove([path]).catch(() => {});
     throw error;
   }
-  return refreshAfterSave();
+  return refreshAfterSave(classroomId);
 }
-async function refreshAfterSave(): Promise<AppState> {
-  try { return await fetchState(); }
+async function refreshAfterSave(classroomId: string | null): Promise<AppState> {
+  try { return await fetchState(classroomId); }
   catch {
     dataStale();
     throw new Error('El cambio se guardó, pero no pudimos actualizar la pantalla. Pulsa Actualizar datos antes de repetir la operación.');
@@ -133,25 +144,30 @@ async function refreshAfterSave(): Promise<AppState> {
 }
 
 export async function updateGrade(assignmentId: string, studentId: string, grade: GradeType, feedback?: string): Promise<AppState> {
-  await rpc('edu_set_grade', { p_assignment_id: assignmentId, p_student_id: studentId, p_grade: grade, p_feedback: feedback ?? null });
-  return refreshAfterSave();
+  const classroomId = selectedClassroom();
+  await rpc('edu_set_grade', { p_classroom_id: classroomId, p_assignment_id: assignmentId, p_student_id: studentId, p_grade: grade, p_feedback: feedback ?? null });
+  return refreshAfterSave(classroomId);
 }
 export async function createAssignment(title: string, subject: string, dueDate: string, description: string): Promise<AppState> {
-  await rpc('edu_create_assignment', { p_title: title, p_subject: subject, p_due_date: dueDate, p_description: description });
-  return refreshAfterSave();
+  const classroomId = selectedClassroom();
+  await rpc('edu_create_assignment', { p_classroom_id: classroomId, p_title: title, p_subject: subject, p_due_date: dueDate, p_description: description });
+  return refreshAfterSave(classroomId);
 }
 export async function deleteAssignment(id: string): Promise<AppState> {
-  await rpc('edu_delete_assignment', { p_id: id }); return refreshAfterSave();
+  const classroomId = selectedClassroom();
+  await rpc('edu_delete_assignment', { p_classroom_id: classroomId, p_id: id }); return refreshAfterSave(classroomId);
 }
 export async function updateRewardsConfig(rewards: RewardsConfig): Promise<AppState> {
-  await rpc('edu_set_rewards', { p_first: rewards.firstPlace, p_second: rewards.secondPlace, p_third: rewards.thirdPlace });
-  return refreshAfterSave();
+  const classroomId = selectedClassroom();
+  await rpc('edu_set_rewards', { p_classroom_id: classroomId, p_first: rewards.firstPlace, p_second: rewards.secondPlace, p_third: rewards.thirdPlace });
+  return refreshAfterSave(classroomId);
 }
 export async function importExcelBase64(fileBase64: string) {
+  const classroomId = selectedClassroom();
   const { importRows, workbookRows } = await import('./excel');
-  const { changes } = importRows(await fetchState(), await workbookRows(fileBase64));
-  const count = await rpc<number>('edu_import_grades', { p_changes: changes });
-  return { state: await refreshAfterSave(), message: `Se actualizaron ${count} calificaciones.`, updatedCount: count };
+  const { changes } = importRows(await fetchState(classroomId), await workbookRows(fileBase64));
+  const count = await rpc<number>('edu_import_grades', { p_classroom_id: classroomId, p_changes: changes });
+  return { state: await refreshAfterSave(classroomId), message: `Se actualizaron ${count} calificaciones.`, updatedCount: count };
 }
 export async function downloadExcel() {
   const [{ createWorkbook }, state] = await Promise.all([import('./excel'), fetchState()]);
@@ -161,12 +177,13 @@ export async function downloadExcel() {
 }
 export function subscribeToRealtimeUpdates(onUpdate: (state: AppState) => void): () => void {
   const supabase = client();
+  const classroomId = selectedClassroom();
   let stopped = false; let busy = false; let pending = false;
   async function refresh() {
     if (stopped) return;
     if (busy) { pending = true; return; }
     busy = true;
-    try { const state = await fetchState(); if (!stopped) onUpdate(state); }
+    try { const state = await fetchState(classroomId); if (!stopped) onUpdate(state); }
     catch (error) {
       const e = error as Error & { status?: number; code?: string };
       if (!stopped) dataStale();

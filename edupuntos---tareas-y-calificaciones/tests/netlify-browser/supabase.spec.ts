@@ -1,3 +1,4 @@
+import { CLASSROOMS } from '../../src/utils/classrooms';
 import { test, expect } from '@playwright/test';
 import { seedState } from '../../server/seed';
 import { calculateStudentScores } from '../../src/utils/scoreCalculator';
@@ -45,10 +46,10 @@ test('Netlify bundles: separate Supabase logins, lost upload response recovery, 
     try { const claims = JSON.parse(Buffer.from(token!.split('.')[1],'base64url').toString()); user = Object.values(users).find(u=>u.id===claims.sub); } catch { /* Anonymous request. */ }
     if(!user) return reply({message:'Unauthorized'},401);
     const name = url.pathname.split('/').pop();
-    if(name==='edu_current_user') return reply(user);
+    if(name==='edu_current_user') return reply({...user,classrooms:[CLASSROOMS[0]]});
     if(name==='edu_state') {
       const own = user.role==='teacher' ? state : {...state,students:state.students.filter(s=>s.id===user.studentId),submissions:state.submissions.filter(s=>s.studentId===user.studentId),grades:state.grades.filter(g=>g.studentId===user.studentId)};
-      return reply({...own,ranking:calculateStudentScores(state)});
+      return reply({...own,classroom:CLASSROOMS[0],ranking:calculateStudentScores(state)});
     }
     if(url.pathname.startsWith('/storage/v1/object/edupuntos-homework/')) { uploads++; return reply({Key:url.pathname.split('/object/')[1]}); }
     if(url.pathname==='/storage/v1/object/sign/edupuntos-homework') {

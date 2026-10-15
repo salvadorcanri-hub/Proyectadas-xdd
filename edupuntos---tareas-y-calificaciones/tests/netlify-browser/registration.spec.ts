@@ -1,3 +1,4 @@
+import { CLASSROOMS } from '../../src/utils/classrooms';
 import { test, expect } from '@playwright/test';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -18,9 +19,9 @@ test('Netlify registration, email confirmation, DNI/email login and role checks 
   await context.route('https://test-project.supabase.co/**',async route=>{
     const req=route.request(),url=new URL(req.url()),body=req.postData()?req.postDataJSON():{};
     const reply=(data:unknown,status=200)=>route.fulfill({status,contentType:'application/json',headers:{'x-supabase-api-version':'2024-01-01','access-control-expose-headers':'X-Supabase-Api-Version'},body:JSON.stringify(data)});
-    if(url.pathname.endsWith('/edu_registration_available')) return reply(true);
+    if(url.pathname.endsWith('/edu_classrooms_available')) return reply(true);
     if(url.pathname==='/auth/v1/signup') {
-      expect(body.data).toEqual({signup_kind:'student',first_name:'Ana',last_name:'Prueba',dni:'00889900'});
+      expect(body.data).toEqual({signup_kind:'student',classroom_id:'sec-1-a',first_name:'Ana',last_name:'Prueba',dni:'00889900'});
       expect(body.email).toBe(user.email); signedUp=true; return reply({...user,identities:[{id:'test'}]});
     }
     if(url.pathname==='/auth/v1/token') {
@@ -30,8 +31,8 @@ test('Netlify registration, email confirmation, DNI/email login and role checks 
     }
     if(url.pathname==='/auth/v1/user') return reply(user);
     if(url.pathname==='/auth/v1/logout') return reply({});
-    if(url.pathname.endsWith('/edu_current_user')) return reply({id:user.id,username:user.email,role,studentId:'registered-1'});
-    if(url.pathname.endsWith('/edu_state')) return reply({students:[{id:'registered-1',name:'Ana Prueba',code:'EST-TEST',avatar:''}],assignments:[],submissions:[],grades:[],ranking:[],rewards:{firstPlace:'Uno',secondPlace:'Dos',thirdPlace:'Tres'}});
+    if(url.pathname.endsWith('/edu_current_user')) return reply({id:user.id,username:user.email,role,studentId:'registered-1',classrooms:[CLASSROOMS[0]]});
+    if(url.pathname.endsWith('/edu_state')) return reply({classroom:CLASSROOMS[0],students:[{id:'registered-1',name:'Ana Prueba',code:'EST-TEST',avatar:''}],assignments:[],submissions:[],grades:[],ranking:[],rewards:{firstPlace:'Uno',secondPlace:'Dos',thirdPlace:'Tres'}});
     throw new Error(`Unexpected request: ${url.pathname}`);
   });
   await context.route('**/.netlify/functions/dni-login',async route=>{
@@ -42,6 +43,7 @@ test('Netlify registration, email confirmation, DNI/email login and role checks 
   await page.goto('http://127.0.0.1:3200/alumnos/');
   await expect(page.getByText('Configuración',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Crear cuenta de alumno'}).click();
+  await page.getByLabel('Grado y sección').selectOption('sec-1-a');
   for(const [label,value] of [['Nombres','Ana'],['Apellidos','Prueba'],['DNI','00889900'],['Correo electrónico',user.email],['Contraseña','Netlify-student-test-123'],['Repite la contraseña','Netlify-student-test-123']]) await page.getByLabel(label,{exact:true}).fill(value);
   await page.getByRole('button',{name:'Crear cuenta',exact:true}).click();
   await expect(page.getByRole('status')).toContainText('Revisa tu correo');expect(signedUp).toBe(true);

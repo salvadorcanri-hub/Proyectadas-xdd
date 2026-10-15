@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { Store } from '../server/store';
 import { createUser } from '../server/auth';
 import type { User } from '../src/types';
-const { values } = parseArgs({ options: { username: { type: 'string' }, role: { type: 'string' }, student: { type: 'string' } } });
-if (!values.username || !['teacher','student'].includes(values.role || '')) throw new Error('Uso: npm run user:create -- --username docente --role teacher (o --role student --student est-1)');
+const { values } = parseArgs({ options: { username: { type: 'string' }, role: { type: 'string' }, student: { type: 'string' }, classrooms: { type: 'string' } } });
+if (!values.username || !['teacher','student'].includes(values.role || '')) throw new Error('Uso: npm run user:create -- --username docente --role teacher --classrooms sec-1-a,sec-2-b (o --role student --student est-1)');
 let password = '';
 if (process.stdin.isTTY) {
   let muted = false;
@@ -23,5 +23,5 @@ if (process.stdin.isTTY) {
 }
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const store = new Store(path.resolve(process.env.DATA_DIR || path.join(root, 'data')));
-try { createUser(store, values.username, password, values.role as User['role'], values.student); console.log('Cuenta creada.'); }
+try { createUser(store, values.username, password, values.role as User['role'], values.student, values.classrooms?.split(',').map(id => id.trim()) || []); console.log('Cuenta creada.'); }
 finally { store.close(); }

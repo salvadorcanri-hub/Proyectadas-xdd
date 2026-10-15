@@ -36,10 +36,19 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
   const registrationMigration = readFileSync(new URL('../supabase/migrations/004_student_registration.sql', import.meta.url), 'utf8');
   await db.exec(registrationMigration); await db.exec(registrationMigration);
   await db.exec(readFileSync(new URL('../supabase/demo.sql', import.meta.url),'utf8'));
+  const legacy = (await db.query('select id,name from public.edu_students order by id')).rows;
+  const classroomMigration = readFileSync(new URL('../supabase/migrations/005_classrooms.sql', import.meta.url), 'utf8');
+  await db.exec(classroomMigration); await db.exec(classroomMigration);
+  assert.equal((await db.query('select * from public.edu_classrooms')).rows.length,20);
+  assert.deepEqual((await db.query('select id,name from public.edu_students order by id')).rows,legacy);
+  assert.equal((await db.query('select * from public.edu_students where classroom_id is null')).rows.length,legacy.length);
+  await db.exec(readFileSync(new URL('../supabase/demo.sql', import.meta.url),'utf8'));
   for (const [id,email] of [[teacher,'teacher@test.invalid'],[student,'one@test.invalid'],[other,'two@test.invalid'],[outsider,'unassigned@test.invalid']]) {
     await db.query('insert into auth.users(id,email) values($1,$2)',[id,email]);
   }
   await db.query("insert into public.edu_profiles values($1,'teacher',null),($2,'student','est-1'),($3,'student','est-2')",[teacher,student,other]);
+  await db.exec("update public.edu_students set classroom_id='sec-1-a'; update public.edu_assignments set classroom_id='sec-1-a';");
+  await db.query("insert into public.edu_teacher_classrooms values($1,'sec-1-a')",[teacher]);
   async function as(id: string, role = 'authenticated') {
     await db.exec('reset role'); await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]); await db.exec(`set role ${role}`);
   }
@@ -144,7 +153,7 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
   await t.test('student registration confirms email, ignores forged roles and keeps DNI private', async () => {
     await db.exec('reset role');
     const id = '20000000-0000-4000-8000-000000000001';
-    const metadata = { signup_kind:'student', first_name:'Ana María', last_name:'Prueba', dni:'00123456', role:'teacher', student_id:'est-1' };
+    const metadata = { signup_kind:'student', classroom_id:'sec-1-a', first_name:'Ana María', last_name:'Prueba', dni:'00123456', role:'teacher', student_id:'est-1' };
     await db.query('insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3)',[id,'ana@example.invalid',metadata]);
     assert.equal((await db.query('select * from public.edu_profiles where user_id=$1',[id])).rows.length,0);
     await as(id); await assert.rejects(state(),/perfil asignado/);
@@ -162,8 +171,10 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
     assert.equal(JSON.stringify(own).includes('ana@example.invalid'),false);
     await assert.rejects(db.query("select public.edu_set_rewards('Uno','Dos','Tres')"),/permiso/);
     await db.exec('reset role');
-    await db.query('update auth.users set raw_user_meta_data=$2,email_confirmed_at=now() where id=$1',[id,{...metadata,dni:'87654321',role:'teacher'}]);
+    await db.query('update auth.users set raw_user_meta_data=$2,email_confirmed_at=now() where id=$1',[id,{...metadata,dni:'87654321',role:'teacher',classroom_id:'sec-5-d'}]);
     assert.equal((await db.query<{dni:string}>('select dni from public.edu_student_accounts where user_id=$1',[id])).rows[0].dni,'00123456');
+    assert.equal((await db.query<{classroom_id:string}>('select classroom_id from public.edu_students where id=$1',[`est-${id}`])).rows[0].classroom_id,'sec-1-a');
+    await assert.rejects(db.query('insert into auth.users(id,email,raw_user_meta_data) values(gen_random_uuid(),$1,$2)',['badclass@example.invalid',{...metadata,dni:'12345678',classroom_id:'sec-6-a'}]),/aula válida/);
     await as(teacher); await assert.rejects(db.query('select * from public.edu_student_accounts'),/permission denied/);
     await as('', 'anon'); await assert.rejects(db.query("select public.edu_login_email('00123456',repeat('a',64))"),/permission denied/);
     await as('', 'service_role');
@@ -173,6 +184,78 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
     }
     assert.deepEqual((await db.query<{result:any}>("select public.edu_login_email('00123456',repeat('b',64)) as result")).rows[0].result,{allowed:false,email:null});
   });
+  await t.test('assigned classrooms isolate teachers, student records, photos, rewards and atomic Excel imports', async () => {
+    await db.exec('reset role');
+    const teacher2='30000000-0000-4000-8000-000000000001', student3='30000000-0000-4000-8000-000000000002';
+    await db.query("insert into auth.users(id,email) values($1,'teacher2@test.invalid'),($2,'three@test.invalid')",[teacher2,student3]);
+    await db.exec("insert into public.edu_students(id,code,name,avatar,classroom_id) values('pilot-3','PILOT-3','Alumno de 2B','','sec-2-b')");
+    await db.query("insert into public.edu_profiles values($1,'teacher',null),($2,'student','pilot-3'),($3,'teacher',null)",[teacher2,student3,outsider]);
+    await db.query("insert into public.edu_teacher_classrooms values($1,'sec-2-b')",[teacher2]);
+    await as(outsider);
+    assert.deepEqual((await db.query<{p:any}>('select public.edu_current_user() p')).rows[0].p.classrooms,[]);
+    await assert.rejects(state(),/aula/);
+    await as(teacher2);
+    await db.exec("select public.edu_create_assignment('Solo 2B','Comunicación','2026-12-01','','sec-2-b')");
+    const b = await state(), task=b.assignments[0].id;
+    assert.deepEqual(b.students.map((s:any)=>s.id),['pilot-3']);
+    assert.equal(b.ranking.length,1);
+    assert.equal(b.classroom.id,'sec-2-b');
+    await db.exec("select public.edu_set_rewards('Premio 2B','Dos','Tres','sec-2-b')");
+    await as(student3);
+    await db.query("insert into storage.objects(bucket_id,name) values('edupuntos-homework',$1)",[`${student3}/homework.png`]);
+    await db.query("select public.edu_submit($1,$2,'',null,'sec-2-b')",[task,`${student3}/homework.png`]);
+    await assert.rejects(db.query("select public.edu_state('sec-1-a')"),/aula/);
+    await assert.rejects(db.query("select public.edu_submit('asg-2',$1,'',null,'sec-2-b')",[`${student3}/homework.png`]),/aula/);
+    await as(teacher);
+    assert.equal((await state()).assignments.some((a:any)=>a.id===task),false);
+    assert.equal((await state()).ranking.some((s:any)=>s.student.id==='pilot-3'),false);
+    assert.notEqual((await state()).rewards.firstPlace,'Premio 2B');
+    await assert.rejects(db.query("select public.edu_state('sec-2-b')"),/aula/);
+    await assert.rejects(db.query("select public.edu_delete_assignment($1,'sec-1-a')",[task]),/aula/);
+    await assert.rejects(db.query("select public.edu_set_grade('asg-2','pilot-3','AD',null,'sec-1-a')"),/aula/);
+    await assert.rejects(db.query("insert into public.edu_teacher_classrooms values($1,'sec-2-b')",[teacher]),/permission denied/);
+    await assert.rejects(db.query("update public.edu_students set classroom_id='sec-1-a' where id='pilot-3'"),/permission denied/);
+    assert.equal((await db.query("select * from public.edu_students where id='pilot-3'")).rows.length,0);
+    assert.equal((await db.query('select * from public.edu_assignments where id=$1',[task])).rows.length,0);
+    assert.equal((await db.query("select * from storage.objects where name=$1",[`${student3}/homework.png`])).rows.length,0);
+    const before=await state();
+    await assert.rejects(db.query("select public.edu_import_grades($1::jsonb,'sec-1-a')",[JSON.stringify([
+      {studentId:'est-1',assignmentId:'asg-2',grade:'A'}, {studentId:'pilot-3',assignmentId:task,grade:'AD'},
+    ])]),/aula/);
+    assert.deepEqual(await state(),before);
+    await as(teacher2);
+    assert.equal((await db.query("select * from storage.objects where name=$1",[`${student3}/homework.png`])).rows.length,1);
+    await db.query("select public.edu_set_grade($1,'pilot-3','AD',null,'sec-2-b')",[task]);
+    await as(student3); assert.equal((await state()).grades[0].grade,'AD');
+    await as(student); assert.equal((await state()).grades.some((g:any)=>g.studentId==='pilot-3'),false);
+    // Permission changes apply to existing sessions, not just the classroom dropdown.
+    await db.exec('reset role');
+    await db.query("insert into public.edu_teacher_classrooms values($1,'sec-2-b')",[teacher]);
+    await as(teacher); await assert.rejects(state(),/aula/); // Multiple classrooms require an explicit choice.
+    assert.equal((await db.query<{s:any}>("select public.edu_state('sec-2-b') s")).rows[0].s.students.length,1);
+    await db.exec('reset role');
+    await db.query("delete from public.edu_teacher_classrooms where user_id=$1 and classroom_id='sec-2-b'",[teacher]);
+    await as(teacher); await assert.rejects(db.query("select public.edu_state('sec-2-b')"),/aula/);
+  });
+
+  await t.test('pilot administration is repeatable and rolls back if either confirmed teacher is missing', async () => {
+    await db.exec('reset role');
+    const script=readFileSync(new URL('../supabase/pilot.example.sql',import.meta.url),'utf8');
+    await assert.rejects(db.exec(script),/Sustituye/); await db.exec('rollback');
+    const id1='40000000-0000-4000-8000-000000000001',id2='40000000-0000-4000-8000-000000000002';
+    const sql=script.replaceAll('profesor1@example.invalid','pilot-one@test.invalid').replaceAll('profesor2@example.invalid','pilot-two@test.invalid');
+    await db.query("insert into auth.users(id,email,email_confirmed_at) values($1,'pilot-one@test.invalid',now())",[id1]);
+    await assert.rejects(db.exec(sql),/Falta una cuenta confirmada/); await db.exec('rollback');
+    assert.equal((await db.query('select * from public.edu_profiles where user_id=$1',[id1])).rows.length,0);
+    await db.query("insert into auth.users(id,email,email_confirmed_at) values($1,'pilot-two@test.invalid',now())",[id2]);
+    await db.exec(sql); await db.exec(sql);
+    assert.deepEqual((await db.query('select classroom_id from public.edu_teacher_classrooms where user_id in ($1,$2) order by classroom_id',[id1,id2])).rows.map((r:any)=>r.classroom_id),['sec-1-a','sec-2-b']);
+    await db.query('update auth.users set email_confirmed_at=now() where id=$1',[student]);
+    await assert.rejects(db.exec(sql.replaceAll('pilot-one@test.invalid','one@test.invalid')),/ya pertenece a un alumno/); await db.exec('rollback');
+    await db.query("insert into public.edu_teacher_classrooms values($1,'sec-3-a')",[id1]);
+    await assert.rejects(db.exec(sql),/ya tiene otras aulas/); await db.exec('rollback');
+  });
+
 });
 
 test('Netlify accepts public configuration and rejects secret/service-role keys', () => {

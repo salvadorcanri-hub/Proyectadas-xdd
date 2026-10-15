@@ -15,7 +15,7 @@ test('registration creates only a student; email/DNI share login, data stays pri
   const base = `http://127.0.0.1:${(server.address() as any).port}`;
   t.after(async () => { close(); server.closeAllConnections(); await new Promise<void>(r=>server.close(()=>r())); store.close(); rmSync(dir,{recursive:true,force:true}); });
   const call = (portal:string,route:string,body:any,cookie='') => fetch(`${base}/api/${portal}${route}`,{method:'POST',headers:{'Content-Type':'application/json','X-EduPuntos-Client':portal,cookie},body:JSON.stringify(body)});
-  const data = {firstName:'Ana',lastName:'Prueba',dni:'00123456',email:'ANA@example.invalid',password:'Student-test-only-123',role:'teacher',studentId:'est-1'};
+  const data = {classroomId:'sec-1-a',firstName:'Ana',lastName:'Prueba',dni:'00123456',email:'ANA@example.invalid',password:'Student-test-only-123',role:'teacher',studentId:'est-1'};
   const before = store.load().students.length;
   assert.equal((await call('teacher','/auth/register',data)).status,403);
   assert.equal((await call('student','/auth/register',{...data,dni:'ABC'})).status,400);

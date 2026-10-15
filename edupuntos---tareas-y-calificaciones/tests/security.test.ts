@@ -14,7 +14,7 @@ import { workbookBuffer } from './workbook-helpers';
 async function fixture(t: any) {
   const dir = mkdtempSync(path.join(tmpdir(), 'edupuntos-security-'));
   const store = new Store(dir);
-  createUser(store, 'teacher-security', 'Security-test-only-123', 'teacher');
+  createUser(store, 'teacher-security', 'Security-test-only-123', 'teacher', undefined, ['sec-1-a']);
   const studentId = createUser(store, 'student-security', 'Security-test-only-123', 'student', 'est-1');
   const { app, close } = createApp(store, { secureCookies: false });
   const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');

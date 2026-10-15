@@ -1,4 +1,7 @@
+import { validateClassroom } from './classrooms';
+
 export interface StudentRegistration {
+  classroomId: string;
   firstName: string;
   lastName: string;
   dni: string;
@@ -16,5 +19,5 @@ export function validateRegistration(value: StudentRegistration): StudentRegistr
   if (!/^\d{8}$/.test(dni)) throw new Error('El DNI debe tener 8 dígitos.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new Error('Escribe un correo electrónico válido.');
   if (typeof value.password !== 'string' || value.password.length < 12 || value.password.length > 128) throw new Error('La contraseña debe tener entre 12 y 128 caracteres.');
-  return { firstName, lastName, dni, email, password: value.password };
+  return { classroomId: validateClassroom(value.classroomId), firstName, lastName, dni, email, password: value.password };
 }

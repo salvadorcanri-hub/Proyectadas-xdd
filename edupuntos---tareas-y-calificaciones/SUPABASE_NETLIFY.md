@@ -9,28 +9,23 @@ Esta modalidad publica dos aplicaciones estáticas en Netlify y usa Supabase par
 3. Guarda esa contraseña de forma privada. **No es una variable del sitio ni tienes que enviarla por chat.**
 4. Espera a que termine de crearse el proyecto.
 
-Cada proyecto de Supabase equivale a un aula/institución compartida: todos sus docentes gestionan los mismos estudiantes. No mezcles escuelas que deban tener datos aislados en este mismo proyecto.
+Cada proyecto representa una institución con 20 aulas de secundaria (1.º–5.º, secciones A–D). Cada profesor gestiona solo las aulas asignadas por el administrador. No mezcles colegios en el mismo proyecto. Consulta [aulas y migración de datos anteriores](CLASSROOMS.md).
 
 ## 2. Crear las tablas, funciones y permisos
 
 1. Dentro de Supabase abre **SQL Editor → New query**.
-2. Ejecuta los archivos de `supabase/migrations/` en orden: `001_edupuntos.sql`, `002_photo_authorization.sql`, `003_photo_grade_comparison.sql` y `004_student_registration.sql`. Copia cada archivo completo, pégalo y pulsa **Run**. Si ya ejecutaste alguno, continúa con los siguientes pendientes; no vuelvas a aplicar una migración antigua después de una nueva. `003` añade la comparación de notas; `004` habilita los perfiles del registro de alumnos y la búsqueda privada para acceder con DNI.
-3. Para empezar con ocho estudiantes y tres tareas de ejemplo, ejecuta también `supabase/demo.sql`. Este paso es opcional, no crea cuentas, notas ni fotos y no sustituye datos existentes.
+2. Ejecuta los archivos de `supabase/migrations/` en orden: `001_edupuntos.sql`, `002_photo_authorization.sql`, `003_photo_grade_comparison.sql`, `004_student_registration.sql` y `005_classrooms.sql`. Copia cada archivo completo, pégalo y pulsa **Run**. Si ya ejecutaste alguno, continúa con los siguientes pendientes; no vuelvas a aplicar una migración antigua después de una nueva. `003` añade la comparación de notas; `004` habilita los perfiles del registro de alumnos y la búsqueda privada para acceder con DNI; `005` crea las 20 aulas y restringe el acceso por asignación.
+3. Para empezar con ocho estudiantes y tres tareas de ejemplo, ejecuta también `supabase/demo.sql`. Este paso es opcional, no crea cuentas, notas ni fotos y no sustituye datos existentes. Los ejemplos quedan pendientes de asignación de aula; no ejecutes este archivo para el piloto de cinco cuentas nuevas.
 
 El primer SQL crea las tablas `edu_*`, un bucket **privado** `edupuntos-homework`, las políticas RLS y las funciones de la aplicación. También incorpora `edu_changes` a la publicación `supabase_realtime`, si existe. Comprueba en la configuración de Realtime/replicación que `edu_changes` está habilitada; solo transmite un contador de cambios, nunca fotos o comentarios. La app también vuelve a consultar cada minuto como respaldo.
 
-No hagas público el bucket y no desactives RLS para resolver errores. Los profesores pueden gestionar el aula; los alumnos solo pueden entregar con su identidad, leer sus notas y abrir sus fotos. El ranking comparte nombres, puntos y recuentos de notas del aula.
+No hagas público el bucket y no desactives RLS para resolver errores. Los profesores pueden gestionar sus aulas asignadas; los alumnos solo pueden entregar con su identidad, leer sus notas y abrir sus fotos. El ranking comparte nombres, puntos y recuentos de notas del aula.
 
-## 3. Crear una cuenta docente y otra de alumno
+## 3. Crear las cuentas y asignar las aulas
 
-1. Abre **Authentication → Users → Add user** y crea una cuenta con correo y contraseña para el profesor y otra diferente para el alumno. Usa la opción de confirmar el correo administrativamente si estás creando cuentas de prueba; así no dependes del envío de correo.
-2. Para permitir que los alumnos se registren desde la web, habilita las inscripciones en Authentication y sigue la [guía de cuentas de alumnos](STUDENT_ACCOUNTS.md), incluida la confirmación del correo y el acceso por DNI. El registro público solo concede el rol de alumno.
-3. Abre `supabase/profiles.example.sql`, sustituye los dos correos por los que acabas de crear y ejecútalo en SQL Editor.
-4. El profesor recibe rol `teacher`. El alumno queda vinculado a `est-1` (Camila, si cargaste la demostración). Para añadir más alumnos, crea sus cuentas y asígnales identificadores distintos, como `est-2`, `est-3`, etc.
+Sigue [PILOT_FIVE_USERS.md](PILOT_FIVE_USERS.md): crea los dos docentes en Authentication, confirma sus cuentas y ejecuta `supabase/pilot.example.sql` con sus correos reales. Ese archivo asigna al primero 1.º A y al segundo 2.º B. Los tres alumnos se registran desde la web, eligen el aula indicada y confirman su correo.
 
-La segunda migración protege las fotografías si se cambia el alumno asociado a una cuenta.
-
-El rol se guarda en `edu_profiles`. Los alumnos que se registran desde la app reciben un perfil de alumno al confirmar su correo; ningún metadato concede permisos docentes. Las cuentas creadas administrativamente necesitan la asignación indicada arriba. Las cuentas de SQLite **no se transfieren**. La recuperación de contraseñas en la interfaz no está implementada: el administrador debe gestionarla desde Supabase.
+El rol se guarda en `edu_profiles`; las asignaciones docentes en `edu_teacher_classrooms`. El registro público solo concede el rol de alumno. La administración de estas asignaciones se hace en Supabase, sin conceder permisos de edición de perfiles a los usuarios. Las cuentas de SQLite no se transfieren. La recuperación de contraseña en la interfaz sigue pendiente.
 
 ## 4. Obtener los dos datos públicos del proyecto
 
@@ -76,9 +71,9 @@ Las fotografías se sirven con enlaces firmados que caducan a los cinco minutos.
 
 ## Datos existentes y límites de esta adaptación
 
-El SQL no importa automáticamente la base SQLite actual ni sus fotos; permanece intacta en el entorno anterior. Para las primeras pruebas usa el aula de demostración. Si necesitas trasladar datos reales, prepara una migración administrativa con respaldo y correspondencia entre estudiantes y cuentas Auth. No publiques esos datos ni claves privadas en GitHub.
+El SQL no importa automáticamente la base SQLite actual ni sus fotos; permanece intacta en el entorno anterior. Para las primeras pruebas sigue el piloto de cinco cuentas nuevas. Si necesitas trasladar datos reales, prepara una migración administrativa con respaldo y correspondencia entre estudiantes y cuentas Auth. No publiques esos datos ni claves privadas en GitHub.
 
-El modo Express/SQLite sigue disponible con `npm run dev`; `render.yaml` se conserva solo como alternativa de pago. No necesitas usarlo para Netlify. Si ya hubieras contratado algo en Render, elimina/cancela allí ese servicio para evitar que siga generando cargos: cambiar el código no lo cancela.
+El modo Express/SQLite sigue disponible con `npm run dev`. Se retiró la configuración de Render porque el despliegue elegido es Netlify + Supabase. Si ya hubieras contratado algo en Render, elimina/cancela allí ese servicio para evitar que siga generando cargos: cambiar el código no lo cancela.
 
 ## Desarrollo y verificaciones
 

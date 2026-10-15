@@ -1,3 +1,4 @@
+import { userClassrooms, requireClassroom, classroomState } from './classrooms';
 import { landingPage } from '../scripts/landing-page.mjs';
 import { registerStudent } from './auth';
 import express, { type Request, type Response, type NextFunction } from 'express';
@@ -24,13 +25,13 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
   const app = express();
   app.disable('x-powered-by');
   app.use(securityHeaders);
-  const clients = new Set<{ res: Response; user: User; token: string }>();
+  const clients = new Set<{ res: Response; user: User; token: string; classroomId: string }>();
   const attempts = new Map<string, { count: number; until: number }>();
   const cookieName = (role: string) => `edupuntos_${role}`;
   const cookieOptions = (role: string) => ({ httpOnly: true, sameSite: 'strict' as const, secure: options.secureCookies ?? process.env.NODE_ENV === 'production', path: `/api/${role}`, maxAge: SESSION_MS });
   const cookieToken = (req: Request, role: string) => (req.headers.cookie || '').split(';').map(c => c.trim()).find(c => c.startsWith(`${cookieName(role)}=`))?.split('=')[1] || '';
-  const project = (user: User): AppState => {
-    const state = store.load();
+  const project = (user: User, classroomId?: string): AppState => {
+    const state = classroomState(store, store.load(), requireClassroom(store, user, classroomId));
     const role = user.role;
     const personal = role === 'teacher' ? state : {
       ...state,
@@ -45,8 +46,8 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
   const notify = () => {
     for (const client of clients) {
       const current = sessionUser(store, client.token, client.user.role);
-      if (!current || current.studentId !== client.user.studentId) { client.res.end(); clients.delete(client); continue; }
-      if (!client.res.write(`data: ${JSON.stringify({ type: 'SYNC', state: project(current) })}\n\n`)) { client.res.end(); clients.delete(client); }
+      if (!current || current.studentId !== client.user.studentId || !userClassrooms(store, current).some(c => c.id === client.classroomId)) { client.res.end(); clients.delete(client); continue; }
+      if (!client.res.write(`data: ${JSON.stringify({ type: 'SYNC', state: project(current, client.classroomId) })}\n\n`)) { client.res.end(); clients.delete(client); }
     }
   };
   const commit = (state: AppState) => { store.save(state); notify(); };
@@ -110,7 +111,7 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
   });
   // Authenticate before accepting large photo/workbook bodies.
   app.use('/api', express.json({ limit: '8mb' }));
-  app.get('/api/:portal/auth/me', (_req, res) => res.json({ user: res.locals.user }));
+  app.get('/api/:portal/auth/me', (_req, res) => res.json({ user: { ...res.locals.user, classrooms: userClassrooms(store, res.locals.user) } }));
   app.post('/api/:portal/auth/logout', (req, res) => {
     const token = cookieToken(req, res.locals.role);
     store.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash(token));
@@ -118,18 +119,20 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
     res.clearCookie(cookieName(res.locals.role), { ...cookieOptions(res.locals.role), maxAge: undefined });
     res.json({ success: true });
   });
-  app.get('/api/:portal/state', (_req, res) => res.json({ success: true, state: project(res.locals.user) }));
+  const scope = (req: Request, res: Response) => requireClassroom(store, res.locals.user, req.get('X-EduPuntos-Classroom') || req.query.classroom);
+  app.get('/api/:portal/state', (req, res) => res.json({ success: true, state: project(res.locals.user, scope(req, res)) }));
   app.get('/api/:portal/events', (req, res) => {
     if (clients.size >= 256 || [...clients].filter(c => c.user.id === res.locals.user.id).length >= 5) return res.status(429).json({ error: 'Demasiadas conexiones abiertas. Cierra otras pestañas.' });
+    const classroomId = scope(req, res);
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
-    const client = { res, user: res.locals.user as User, token: cookieToken(req, res.locals.role) };
+    const client = { res, user: res.locals.user as User, classroomId, token: cookieToken(req, res.locals.role) };
     clients.add(client);
-    res.write(`data: ${JSON.stringify({ type: 'INIT', state: project(client.user) })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'INIT', state: project(client.user, client.classroomId) })}\n\n`);
     const heartbeat = setInterval(() => {
       const current = sessionUser(store, client.token, client.user.role);
-      if (!current || current.studentId !== client.user.studentId) res.end();
+      if (!current || current.studentId !== client.user.studentId || !userClassrooms(store, current).some(c => c.id === client.classroomId)) res.end();
       else res.write(': heartbeat\n\n');
     }, 15000);
     res.on('close', () => { clearInterval(heartbeat); clients.delete(client); });
@@ -137,7 +140,9 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
   app.get('/api/:portal/files/:name', (req, res) => {
     const name = req.params.name;
     const user = res.locals.user as User;
-    const allowed = store.load().submissions.some(s => s.photoUrl === `/files/${name}` && (user.role === 'teacher' || s.studentId === user.studentId));
+    const state = store.load();
+    const permitted = new Set(userClassrooms(store, user).map(c => c.id));
+    const allowed = state.submissions.some(s => s.photoUrl === `/files/${name}` && (user.role === 'teacher' || s.studentId === user.studentId) && state.assignments.some(a => a.id === s.assignmentId && permitted.has(a.classroomId || '') && state.students.some(student => student.id === s.studentId && student.classroomId === a.classroomId)));
     if (!/^[a-f0-9]{64}\.(png|jpeg|webp)$/.test(name) || !allowed) return res.status(404).json({ error: 'Imagen no disponible.' });
     res.sendFile(path.resolve(store.dataDir, 'uploads', name));
   });
@@ -150,8 +155,9 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
     if (user.role !== 'student') throw new HttpError(403, 'Solo el estudiante puede entregar su tarea.');
     if (req.body.studentId !== undefined && req.body.studentId !== user.studentId) throw new HttpError(403, 'No puedes entregar tareas de otro estudiante.');
     const state = store.load();
+    const classroomId = scope(req, res);
     const assignmentId = text(req.body.assignmentId, 'Tarea', 100);
-    if (!state.assignments.some(a => a.id === assignmentId)) throw new HttpError(404, 'La tarea no existe.');
+    if (!state.assignments.some(a => a.id === assignmentId && a.classroomId === classroomId)) throw new HttpError(404, 'La tarea no existe.');
     const comment = text(req.body.comment, 'Comentario', 2000, true);
     let photoReading;
     try { photoReading = validatePhotoReading(req.body.photoReading); }
@@ -165,18 +171,19 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
     // The teacher already graded this work at school. A photo never changes the official record.
     commit(state);
     removeUnusedPhotos(store.dataDir, previousPhoto ? [previousPhoto] : [], state.submissions);
-    res.json({ success: true, state: project(user) });
+    res.json({ success: true, state: project(user, classroomId) });
   });
   app.post('/api/:portal/grades', teacher, (req, res) => {
     const state = store.load();
+    const classroomId = scope(req, res);
     const { assignmentId, studentId, grade } = req.body;
-    if (!state.assignments.some(a => a.id === assignmentId) || !state.students.some(s => s.id === studentId)) throw new HttpError(404, 'Tarea o estudiante inexistente.');
+    if (!state.assignments.some(a => a.id === assignmentId && a.classroomId === classroomId) || !state.students.some(s => s.id === studentId && s.classroomId === classroomId)) throw new HttpError(404, 'Tarea o estudiante inexistente.');
     if (!['AD','A','B','C',null].includes(grade)) throw new HttpError(400, 'Nota inválida.');
     const existing = state.grades.find(g => g.studentId === studentId && g.assignmentId === assignmentId);
     const feedback = req.body.feedback === undefined ? existing?.feedback || '' : text(req.body.feedback, 'Comentario', 2000, true);
     const record = { assignmentId, studentId, grade, feedback, updatedAt: new Date().toISOString() };
     if (existing) Object.assign(existing, record); else state.grades.push(record);
-    commit(state); res.json({ success: true, state: project(res.locals.user) });
+    commit(state); res.json({ success: true, state: project(res.locals.user, scope(req, res)) });
   });
   app.post('/api/:portal/assignments', teacher, (req, res) => {
     const state = store.load();
@@ -185,29 +192,32 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
     const description = text(req.body.description, 'Descripción', 5000, true);
     const dueDate = text(req.body.dueDate, 'Fecha de entrega', 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || Number.isNaN(Date.parse(dueDate)) || new Date(dueDate).toISOString().slice(0,10) !== dueDate) throw new HttpError(400, 'Fecha de entrega inválida.');
-    state.assignments.push({ id: `asg-${randomUUID()}`, title, subject, dueDate, description, createdAt: new Date().toISOString().slice(0,10) });
-    commit(state); res.json({ success: true, state: project(res.locals.user) });
+    state.assignments.push({ classroomId: scope(req, res), id: `asg-${randomUUID()}`, title, subject, dueDate, description, createdAt: new Date().toISOString().slice(0,10) });
+    commit(state); res.json({ success: true, state: project(res.locals.user, scope(req, res)) });
   });
   app.delete('/api/:portal/assignments/:id', teacher, (req, res) => {
     const state = store.load(); const id = req.params.id;
-    if (!state.assignments.some(a => a.id === id)) throw new HttpError(404, 'La tarea no existe.');
+    if (!state.assignments.some(a => a.id === id && a.classroomId === scope(req, res))) throw new HttpError(404, 'La tarea no existe.');
     const removedPhotos = state.submissions.filter(s => s.assignmentId === id).map(s => s.photoUrl);
     state.assignments = state.assignments.filter(a => a.id !== id);
     state.submissions = state.submissions.filter(s => s.assignmentId !== id);
     state.grades = state.grades.filter(g => g.assignmentId !== id);
     commit(state);
     removeUnusedPhotos(store.dataDir, removedPhotos, state.submissions);
-    res.json({ success: true, state: project(res.locals.user) });
+    res.json({ success: true, state: project(res.locals.user, scope(req, res)) });
   });
   app.post('/api/:portal/rewards', teacher, (req, res) => {
-    const state = store.load();
-    state.rewards = { firstPlace: text(req.body.firstPlace, 'Primer premio', 500), secondPlace: text(req.body.secondPlace, 'Segundo premio', 500), thirdPlace: text(req.body.thirdPlace, 'Tercer premio', 500) };
-    commit(state); res.json({ success: true, state: project(res.locals.user) });
+    const classroomId = scope(req, res);
+    const rewards = { firstPlace: text(req.body.firstPlace, 'Primer premio', 500), secondPlace: text(req.body.secondPlace, 'Segundo premio', 500), thirdPlace: text(req.body.thirdPlace, 'Tercer premio', 500) };
+    store.db.prepare('INSERT INTO settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(`rewards:${classroomId}`, JSON.stringify(rewards));
+    notify(); res.json({ success: true, state: project(res.locals.user, classroomId) });
   });
   app.get('/api/:portal/excel-export', teacher, async (req, res, next) => {
     try {
-      const file = await exportWorkbook(store.load());
+      const classroomId = scope(req, res);
+      const file = await exportWorkbook(project(res.locals.user, classroomId));
       if (!sessionUser(store, cookieToken(req, 'teacher'), 'teacher')) return res.status(401).json({ error: 'Inicia sesión de nuevo.' });
+      requireClassroom(store, res.locals.user, classroomId);
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename="EduPuntos_Registro_Notas.xlsx"');
       res.send(file);
@@ -221,10 +231,14 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
       if (!sessionUser(store, cookieToken(req, 'teacher'), 'teacher')) return res.status(401).json({ error: 'Inicia sesión de nuevo.' });
       const state = store.load();
       let result: ReturnType<typeof importRows>;
-      try { result = importRows(state, rows); }
+      const classroomId = scope(req, res);
+      const scoped = classroomState(store, state, classroomId);
+      try { result = importRows(scoped, rows); }
       catch (error) { throw new HttpError(400, (error as Error).message); }
-      state.grades = result.grades; commit(state);
-      res.json({ success: true, updatedGradesCount: result.count, state: project(res.locals.user), message: `Se actualizaron ${result.count} calificaciones.` });
+      const taskIds = new Set(scoped.assignments.map(a => a.id));
+      const studentIds = new Set(scoped.students.map(s => s.id));
+      state.grades = [...state.grades.filter(g => !taskIds.has(g.assignmentId) || !studentIds.has(g.studentId)), ...result.grades]; commit(state);
+      res.json({ success: true, updatedGradesCount: result.count, state: project(res.locals.user, scope(req, res)), message: `Se actualizaron ${result.count} calificaciones.` });
     } catch (error) { next(error); }
   });
   if (options.webRoot) {

@@ -1,10 +1,11 @@
+import { selectedClassroom } from './classroom-selection';
 import { monitoredFetch, dataUpdated, dataStale, realtimeStatus } from './connection';
 import { AppState, GradeType, RewardsConfig, PhotoReading } from '../types';
 import { validateRegistration, type StudentRegistration } from '../utils/registration';
 
 export const API_BASE = `/api/${__APP_ROLE__}`;
-export async function request(endpoint: string, options: RequestInit = {}) {
-  const res = await monitoredFetch(API_BASE + endpoint, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-EduPuntos-Client': __APP_ROLE__, ...options.headers } });
+export async function request(endpoint: string, options: RequestInit = {}, classroomId = selectedClassroom()) {
+  const res = await monitoredFetch(API_BASE + endpoint, { ...options, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-EduPuntos-Client': __APP_ROLE__, ...(classroomId ? { 'X-EduPuntos-Classroom': classroomId } : {}), ...options.headers } });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401 && !endpoint.startsWith('/auth/')) window.dispatchEvent(new Event('session-expired'));
@@ -13,13 +14,14 @@ export async function request(endpoint: string, options: RequestInit = {}) {
   return data;
 }
 
-export async function fetchState(): Promise<AppState> { const result = (await request('/state')).state; dataUpdated(); return result; }
+export async function fetchState(classroomId = selectedClassroom()): Promise<AppState> { const result = (await request('/state', {}, classroomId)).state; dataUpdated(); return result; }
 export async function submitHomework(assignmentId: string, studentId: string, photoUrl: string, comment?: string, photoReading?: PhotoReading | null): Promise<AppState> {
-  try { return (await request('/submissions', { method: 'POST', body: JSON.stringify({ assignmentId, studentId, photoUrl, comment, photoReading }) })).state; }
+  const classroomId = selectedClassroom();
+  try { return (await request('/submissions', { method: 'POST', body: JSON.stringify({ assignmentId, studentId, photoUrl, comment, photoReading }) }, classroomId)).state; }
   catch (error) {
     if ((error as { code?: string }).code !== 'UNCONFIRMED') throw error;
     try {
-      const saved = await fetchState();
+      const saved = await fetchState(classroomId);
       const match = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(photoUrl);
       if (match) {
         const bytes = Uint8Array.from(atob(match[2]), character => character.charCodeAt(0));
@@ -50,13 +52,14 @@ export async function updateRewardsConfig(rewards: RewardsConfig): Promise<AppSt
   return (await request('/rewards', { method: 'POST', body: JSON.stringify(rewards) })).state;
 }
 export function subscribeToRealtimeUpdates(onUpdate: (state: AppState) => void): () => void {
-  const events = new EventSource(API_BASE + '/events');
+  const classroomId = selectedClassroom();
+  const events = new EventSource(API_BASE + '/events' + (classroomId ? `?classroom=${encodeURIComponent(classroomId)}` : ''));
   let stopped = false;
   let refreshing = false;
   const refresh = async () => {
     if (stopped || refreshing) return;
     refreshing = true;
-    try { const state = await fetchState(); if (!stopped) onUpdate(state); }
+    try { const state = await fetchState(classroomId); if (!stopped) onUpdate(state); }
     catch { if (!stopped) dataStale(); }
     finally { refreshing = false; }
   };
@@ -77,4 +80,4 @@ export async function currentUser() { return (await request('/auth/me')).user; }
 export async function login(username: string, password: string) { return request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }); }
 export async function register(input: StudentRegistration): Promise<{ confirmationRequired: boolean }> { return request('/auth/register', { method: 'POST', body: JSON.stringify(validateRegistration(input)) }); }
 export async function logout() { await request('/auth/logout', { method: 'POST', body: '{}' }); }
-export async function downloadExcel() { window.location.href = `${API_BASE}/excel-export`; }
+export async function downloadExcel() { window.location.href = `${API_BASE}/excel-export?classroom=${encodeURIComponent(selectedClassroom() || '')}`; }

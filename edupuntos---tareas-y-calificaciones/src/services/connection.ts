@@ -16,7 +16,7 @@ export function resetConnection() { update({ stale: false, realtimeLost: false, 
 function requestKind(input: RequestInfo | URL, init?: RequestInit) {
   const url = new URL(input instanceof Request ? input.url : String(input), 'http://local');
   const method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
-  const read = ['GET', 'HEAD'].includes(method) || /\/rpc\/(edu_current_user|edu_state|edu_registration_available)$/.test(url.pathname)
+  const read = ['GET', 'HEAD'].includes(method) || /\/rpc\/(edu_current_user|edu_state|edu_registration_available|edu_classrooms_available)$/.test(url.pathname)
     || /\/storage\/v1\/object\/sign\//.test(url.pathname) || /\/(token|login|dni-login)$/.test(url.pathname);
   return { write: !read, upload: method === 'POST' && /\/storage\/v1\/object\//.test(url.pathname) && !read };
 }

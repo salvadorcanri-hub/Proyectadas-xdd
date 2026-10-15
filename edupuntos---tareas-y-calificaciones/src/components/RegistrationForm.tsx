@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CLASSROOMS } from '../utils/classrooms';
 import { register } from '../services/api';
 import { validateRegistration } from '../utils/registration';
 
@@ -8,6 +9,7 @@ export function RegistrationForm({ onBack, onRegistered }: {
   const [firstName, setFirstName] = useState(''), [lastName, setLastName] = useState('');
   const [dni, setDni] = useState(''), [email, setEmail] = useState('');
   const [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState('');
+  const [classroomId, setClassroomId] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const inputClass = 'mt-1 w-full border rounded-lg p-3';
   return <form className="login-form space-y-4" onSubmit={async event => {
@@ -15,7 +17,7 @@ export function RegistrationForm({ onBack, onRegistered }: {
     if (password !== confirmation) { setError('Las contraseñas no coinciden.'); return; }
     setBusy(true);
     try {
-      const data = validateRegistration({ firstName, lastName, dni, email, password });
+      const data = validateRegistration({ classroomId, firstName, lastName, dni, email, password });
       const result = await register(data);
       setPassword(''); setConfirmation('');
       await onRegistered(data.email, result.confirmationRequired);
@@ -25,6 +27,7 @@ export function RegistrationForm({ onBack, onRegistered }: {
     <div><span className="eyebrow">TU ESPACIO DE APRENDIZAJE</span><h1>Crea tu cuenta de alumno</h1><p className="mt-2 text-sm text-slate-600 dark:text-slate-200">Podrás ingresar con tu DNI o tu correo electrónico.</p></div>
     <label className="block text-sm font-medium">Nombres<input autoComplete="given-name" required maxLength={100} value={firstName} onChange={e => setFirstName(e.target.value)} className={inputClass}/></label>
     <label className="block text-sm font-medium">Apellidos<input autoComplete="family-name" required maxLength={100} value={lastName} onChange={e => setLastName(e.target.value)} className={inputClass}/></label>
+    <label className="block text-sm font-medium">Grado y sección<select required value={classroomId} onChange={event => setClassroomId(event.target.value)} className={inputClass}><option value="" disabled>Selecciona tu aula</option>{CLASSROOMS.map(classroom => <option key={classroom.id} value={classroom.id}>{classroom.name}</option>)}</select></label>
     <label className="block text-sm font-medium">DNI<input inputMode="numeric" autoComplete="off" pattern="[0-9]{8}" title="8 dígitos" minLength={8} maxLength={8} required value={dni} onChange={e => setDni(e.target.value)} className={inputClass} aria-describedby="dni-privacy"/></label>
     <p id="dni-privacy" className="text-xs text-slate-500 dark:text-slate-400">Tu DNI se usa para iniciar sesión y no se muestra a otros alumnos.</p>
     <label className="block text-sm font-medium">Correo electrónico<input type="email" autoComplete="email" maxLength={254} required value={email} onChange={e => setEmail(e.target.value)} className={inputClass}/></label>

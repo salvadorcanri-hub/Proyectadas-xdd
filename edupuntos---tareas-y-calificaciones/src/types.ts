@@ -14,7 +14,10 @@ export const GRADE_DESCRIPTIONS: Record<'AD' | 'A' | 'B' | 'C', string> = {
   C: 'En Inicio (4 pts)',
 };
 
+export interface Classroom { id: string; grade: number; section: string; name: string; }
+
 export interface Student {
+  classroomId?: string | null;
   id: string;
   code: string;
   name: string;
@@ -22,6 +25,7 @@ export interface Student {
 }
 
 export interface Assignment {
+  classroomId?: string | null;
   id: string;
   title: string;
   subject: string;
@@ -78,6 +82,7 @@ export interface StudentScore {
 }
 
 export interface AppState {
+  classroom?: Classroom;
   students: Student[];
   assignments: Assignment[];
   submissions: Submission[];
@@ -87,6 +92,7 @@ export interface AppState {
 }
 
 export interface User {
+  classrooms?: Classroom[];
   id: string;
   username: string;
   role: 'teacher' | 'student';
