@@ -27,3 +27,7 @@ La función de Netlify verifica el token con Supabase Auth y consulta el permiso
 Para revocar la capacidad de crear cuentas elimina la fila del usuario de `edu_admins` desde el panel administrativo. La siguiente solicitud será rechazada aunque la interfaz conserve el botón. Ser administrador no concede acceso a aulas no asignadas. Las asignaciones de cuentas existentes siguen gestionándose en Supabase.
 
 El servidor local tiene el mismo formulario y comprueba la tabla privada `admins` de SQLite; no replica cuentas hacia Supabase. Para desarrollo un administrador local se crea con `user:create` y un operador autorizado añade su ID a `admins`. Las pruebas usan usuarios temporales en bases aisladas.
+
+## Pruebas realizadas
+
+Tipos correctos; 38 pruebas de servidor/SQL, 17 de navegador con servidor local y 5 del cliente Netlify con Supabase simulado. El recorrido del administrador crea un profesor y un alumno y prueba sus accesos, incluido DNI. Las pruebas SQL verifican que no se puedan conceder permisos con metadatos públicos, que un alta docente inválida se revierta y que exista un límite de intentos. La función Netlify se prueba con respuestas Auth/RPC simuladas: no se ha creado ni probado una cuenta en el proyecto remoto.
