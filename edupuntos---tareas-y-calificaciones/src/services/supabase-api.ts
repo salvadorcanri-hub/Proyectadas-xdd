@@ -203,3 +203,10 @@ export function subscribeToRealtimeUpdates(onUpdate: (state: AppState) => void):
   });
   return () => { stopped = true; window.clearInterval(timer); window.removeEventListener('focus', focus); window.removeEventListener('online', focus); window.removeEventListener('edupuntos-refresh', focus); subscription.unsubscribe(); void supabase.removeChannel(channel); };
 }
+
+export async function createAccount(input: import('../utils/admin-account').NewAccount): Promise<{message:string}> {
+ const {data:{session}}=await client().auth.getSession();
+ if(!session) throw new Error('Inicia sesión de nuevo.');
+ const response=await monitoredFetch('/.netlify/functions/admin-accounts',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`},body:JSON.stringify(input)});
+ const result=await response.json(); if(!response.ok) throw new Error(result.error || 'No se pudo crear la cuenta.');return result;
+}

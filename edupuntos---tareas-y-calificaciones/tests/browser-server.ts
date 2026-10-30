@@ -6,6 +6,8 @@ import { Store } from '../server/store';
 import { createUser } from '../server/auth';
 const data = mkdtempSync(path.join(tmpdir(), 'edupuntos-browser-'));
 const store = new Store(data);
+const adminId=createUser(store,'test-admin','Browser-test-only-123','teacher');
+store.db.prepare('INSERT INTO admins VALUES (?)').run(adminId);
 createUser(store, 'test-teacher', 'Browser-test-only-123', 'teacher', undefined, ['sec-1-a']);
 createUser(store, 'pilot-teacher-1', 'Browser-test-only-123', 'teacher', undefined, ['sec-4-c']);
 createUser(store, 'pilot-teacher-2', 'Browser-test-only-123', 'teacher', undefined, ['sec-5-d']);

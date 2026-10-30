@@ -9,6 +9,8 @@ El código prepara las aulas y sus permisos. Las cuentas reales se crean en tu p
 3. Conserva `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`. Para probar DNI también necesitas `SUPABASE_SECRET_KEY` **solo en Netlify Functions**, sin prefijo `VITE_`. Sigue [la configuración de cuentas](STUDENT_ACCOUNTS.md). Esta actualización no requiere otra clave.
 4. En Supabase Authentication, configura Site URL con tu dominio y Redirect URLs con `https://mini-proyectos.netlify.app/alumnos/` si ese sigue siendo tu dominio. Activa Email y la confirmación del correo. Para enviar a tres personas externas, comprueba las restricciones del correo de Supabase y configura SMTP propio si corresponde. Haz primero una prueba con un destinatario; los correos simulados de los tests no verifican la entrega real.
 
+También puedes crear las cuentas desde la app de profesores una vez activada la [administración de cuentas](ADMIN_ACCOUNTS.md), que requiere la migración 006.
+
 ## 2. Repartir las cinco cuentas
 
 | Persona | Rol | Aula |

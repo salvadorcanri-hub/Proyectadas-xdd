@@ -1,3 +1,4 @@
+import { AdminAccounts } from './components/AdminAccounts';
 import { BookOpen, ArrowUpRight, CheckCircle2, Sparkles } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { AppState, User } from './types';
@@ -20,6 +21,7 @@ export function SessionApp({ children }: { children: (props: ViewProps) => React
   const [registering, setRegistering] = useState(false);
   const [loginMode, setLoginMode] = useState<'email' | 'dni'>('email');
   const [classroomId, setClassroomId] = useState<string | null>(null);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const refresh = async () => {
     setLoading(true); setError(''); setLoadFailed(false);
@@ -53,8 +55,9 @@ export function SessionApp({ children }: { children: (props: ViewProps) => React
   }
   const connection = <ConnectionNotice authenticated={!!user}/>;
   if (loading) return <>{connection}<main className="min-h-screen grid place-items-center">Cargando EduPuntos…</main></>;
+  if (user?.isAdmin && __APP_ROLE__ === 'teacher' && (adminOpen || !user.classrooms?.length)) return <>{connection}<AdminAccounts canReturn={!!user.classrooms?.length} onBack={() => setAdminOpen(false)} onLogout={() => void logout()}/></>;
   if (user && !user.classrooms?.length) return <>{connection}<main className="pending-classroom"><h1>Aula pendiente de asignación</h1><p>{user.role === 'teacher' ? 'El administrador debe asignarte las aulas que impartes.' : 'Tu cuenta está creada. El administrador debe asignarte tu grado y sección.'}</p><p>Los datos anteriores se conservan. Hay 20 aulas de secundaria: de 1.º a 5.º, secciones A, B, C y D.</p>{error && <p role="alert">{error}</p>}<button onClick={() => void refresh()}>Comprobar asignación</button><button onClick={() => void logout()}>Cerrar sesión</button></main></>;
-  if (user && state) return <>{connection}{error && <p role="alert" className="p-3 bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-200">{error}</p>}<ClassroomContext.Provider key={classroomId} value={{ classrooms: user.classrooms || [], selected: classroomId!, change: id => void changeClassroom(id) }}>{children({ state, user, onStateUpdate: applyState, onLogout: () => void logout() })}</ClassroomContext.Provider></>;
+  if (user && state) return <>{connection}{user.isAdmin && __APP_ROLE__ === 'teacher' && <button className="auth-text-button p-3" onClick={() => setAdminOpen(true)}>Administrar cuentas</button>}{error && <p role="alert" className="p-3 bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-200">{error}</p>}<ClassroomContext.Provider key={classroomId} value={{ classrooms: user.classrooms || [], selected: classroomId!, change: id => void changeClassroom(id) }}>{children({ state, user, onStateUpdate: applyState, onLogout: () => void logout() })}</ClassroomContext.Provider></>;
   return <>{connection}<main className={`login-page ${__APP_ROLE__ === 'teacher' ? 'login-teacher' : 'login-student'}`}>
     <section className="login-story"><div className="brand"><span className="brand-symbol"><BookOpen size={24}/></span><span><strong>edu<span>puntos</span><i>.</i></strong><small>APRENDEMOS JUNTOS</small></span></div><div className="login-story-copy"><span className="eyebrow">{__APP_ROLE__ === 'teacher' ? 'ENSEÑAR TAMBIÉN ES ACOMPAÑAR' : 'TU ESFUERZO TIENE VALOR'}</span><h2>{__APP_ROLE__ === 'teacher' ? 'Más cerca de cada aprendizaje.' : 'Grandes logros. Pequeños pasos.'}</h2><p>{__APP_ROLE__ === 'teacher' ? 'Un espacio para organizar tu aula, reconocer el esfuerzo y ver crecer a tus estudiantes.' : 'Tus tareas, tus avances y nuevos retos. Todo en un espacio hecho para ti.'}</p><div className="login-feature"><CheckCircle2 size={19}/><span>{__APP_ROLE__ === 'teacher' ? 'Tareas y calificaciones en un mismo lugar' : 'Comparte tu trabajo y descubre tu progreso'}</span></div><div className="login-feature"><Sparkles size={19}/><span>{__APP_ROLE__ === 'teacher' ? 'Conectado con el espacio de tus alumnos' : 'Cada nuevo aprendizaje suma'}</span></div></div><small className="login-story-footer">Cada avance cuenta <ArrowUpRight size={15}/></small></section>
     <div className="login-form-wrap"><div className="login-content">

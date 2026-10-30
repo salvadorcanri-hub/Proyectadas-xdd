@@ -16,7 +16,7 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
   await db.exec(`
     create role anon nologin; create role authenticated nologin; create role service_role nologin;
     create schema auth; create schema storage;
-    create table auth.users(id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz);
+    create table auth.users(id uuid primary key, email text, raw_app_meta_data jsonb default '{}', raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz);
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     grant usage on schema auth, public, storage to anon, authenticated;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -39,6 +39,8 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
   const legacy = (await db.query('select id,name from public.edu_students order by id')).rows;
   const classroomMigration = readFileSync(new URL('../supabase/migrations/005_classrooms.sql', import.meta.url), 'utf8');
   await db.exec(classroomMigration); await db.exec(classroomMigration);
+  const adminMigration=readFileSync(new URL('../supabase/migrations/006_admin_accounts.sql',import.meta.url),'utf8');
+  await db.exec(adminMigration); await db.exec(adminMigration);
   assert.equal((await db.query('select * from public.edu_classrooms')).rows.length,20);
   assert.deepEqual((await db.query('select id,name from public.edu_students order by id')).rows,legacy);
   assert.equal((await db.query('select * from public.edu_students where classroom_id is null')).rows.length,legacy.length);
@@ -254,6 +256,37 @@ test('Supabase SQL: roles, private storage, transactions, ranking and change not
     await assert.rejects(db.exec(sql.replaceAll('pilot-one@test.invalid','one@test.invalid')),/ya pertenece a un alumno/); await db.exec('rollback');
     await db.query("insert into public.edu_teacher_classrooms values($1,'sec-3-a')",[id1]);
     await assert.rejects(db.exec(sql),/ya tiene otras aulas/); await db.exec('rollback');
+  });
+
+  await t.test('admin capability is private, bootstrap explicit, and teacher provisioning is atomic',async()=>{
+    await db.exec('reset role');
+    const adminId='50000000-0000-4000-8000-000000000001';
+    await db.query("insert into auth.users(id,email,email_confirmed_at) values($1,'salvadorcanri@gmail.com',now())",[adminId]);
+    const bootstrap=readFileSync(new URL('../supabase/bootstrap-admin.sql',import.meta.url),'utf8');
+    await db.exec(bootstrap);await db.exec(bootstrap);
+    await as(adminId);
+    assert.equal((await db.query<{p:any}>('select public.edu_current_user() p')).rows[0].p.isAdmin,true);
+    await assert.rejects(db.query('select * from public.edu_admins'),/permission denied/);
+    await assert.rejects(db.query('select public.edu_authorize_account_creation($1)',[adminId]),/permission denied/);
+    await as(teacher);
+    assert.equal((await db.query<{p:any}>('select public.edu_current_user() p')).rows[0].p.isAdmin,false);
+    await assert.rejects(db.query('insert into public.edu_admins values($1)',[teacher]),/permission denied/);
+    await as('', 'service_role');
+    await assert.rejects(db.query('select public.edu_authorize_account_creation($1)',[teacher]),/administrador/);
+    for(let i=0;i<20;i++) assert.equal((await db.query<{ok:boolean}>('select public.edu_authorize_account_creation($1) ok',[adminId])).rows[0].ok,true);
+    assert.equal((await db.query<{ok:boolean}>('select public.edu_authorize_account_creation($1) ok',[adminId])).rows[0].ok,false);
+    await db.exec('reset role');
+    const newId='50000000-0000-4000-8000-000000000002';
+    await db.query("insert into auth.users(id,email,email_confirmed_at,raw_app_meta_data) values($1,'created-teacher@test.invalid',now(),$2)",[newId,{edu_role:'teacher',edu_classrooms:['sec-1-a','sec-2-b']}]);
+    await as(newId);
+    const profile=(await db.query<{p:any}>('select public.edu_current_user() p')).rows[0].p;
+    assert.equal(profile.role,'teacher');assert.equal(profile.isAdmin,false);assert.equal(profile.classrooms.length,2);
+    await db.exec('reset role');
+    await assert.rejects(db.query("insert into auth.users(id,email,email_confirmed_at,raw_app_meta_data) values(gen_random_uuid(),'invalid-teacher@test.invalid',now(),$1)",[{edu_role:'teacher',edu_classrooms:['sec-1-a','sec-6-z']}]),/foreign key/);
+    assert.equal((await db.query("select id from auth.users where email='invalid-teacher@test.invalid'")).rows.length,0);
+    const forged='50000000-0000-4000-8000-000000000003';
+    await db.query("insert into auth.users(id,email,email_confirmed_at,raw_user_meta_data) values($1,'forged-admin@test.invalid',now(),$2)",[forged,{edu_role:'teacher',isAdmin:true,edu_classrooms:['sec-1-a']}]);
+    await as(forged);await assert.rejects(db.query('select public.edu_current_user()'),/perfil asignado/);
   });
 
 });

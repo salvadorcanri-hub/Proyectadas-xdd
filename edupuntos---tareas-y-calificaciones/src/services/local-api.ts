@@ -81,3 +81,5 @@ export async function login(username: string, password: string) { return request
 export async function register(input: StudentRegistration): Promise<{ confirmationRequired: boolean }> { return request('/auth/register', { method: 'POST', body: JSON.stringify(validateRegistration(input)) }); }
 export async function logout() { await request('/auth/logout', { method: 'POST', body: '{}' }); }
 export async function downloadExcel() { window.location.href = `${API_BASE}/excel-export?classroom=${encodeURIComponent(selectedClassroom() || '')}`; }
+
+export async function createAccount(input: import('../utils/admin-account').NewAccount): Promise<{message:string}> {return request('/admin/accounts',{method:'POST',body:JSON.stringify(input)});}

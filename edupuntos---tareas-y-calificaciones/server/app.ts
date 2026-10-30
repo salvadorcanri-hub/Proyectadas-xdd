@@ -1,6 +1,7 @@
 import { userClassrooms, requireClassroom, classroomState } from './classrooms';
 import { landingPage } from '../scripts/landing-page.mjs';
-import { registerStudent } from './auth';
+import { registerStudent, createUser } from './auth';
+import { validateNewAccount } from '../src/utils/admin-account';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
@@ -109,9 +110,23 @@ export function createApp(store: Store, options: { secureCookies?: boolean; webR
     res.locals.user = user;
     next();
   });
+  app.post('/api/:portal/admin/accounts', express.json({limit:'8kb'}), async(req,res)=>{
+    const user=res.locals.user as User;
+    if(user.role!=='teacher' || !store.db.prepare('SELECT 1 FROM admins WHERE user_id=?').get(user.id)) return res.status(403).json({error:'Solo el administrador puede crear cuentas.'});
+    const key=`admin:${user.id}`,now=Date.now();let attempt=attempts.get(key);
+    if(!attempt || attempt.until<=now) attempt={count:0,until:now+900000};
+    if(attempt.count>=20) return res.status(429).json({error:'Has alcanzado 20 intentos. Espera 15 minutos.'});
+    attempt.count++;attempts.set(key,attempt);
+    try{
+      const data=validateNewAccount(req.body);
+      if(data.role==='student') await registerStudent(store,{email:data.email,password:data.password,firstName:data.firstName!,lastName:data.lastName!,dni:data.dni!,classroomId:data.classroomIds[0]});
+      else createUser(store,data.email,data.password,'teacher',undefined,data.classroomIds);
+      notify();return res.status(201).json({message:'Cuenta creada. Ya puede iniciar sesión con su correo y contraseña.'});
+    }catch{return res.status(400).json({error:'No se pudo crear la cuenta. Revisa los datos y si el correo o DNI ya existe.'});}
+  });
   // Authenticate before accepting large photo/workbook bodies.
   app.use('/api', express.json({ limit: '8mb' }));
-  app.get('/api/:portal/auth/me', (_req, res) => res.json({ user: { ...res.locals.user, classrooms: userClassrooms(store, res.locals.user) } }));
+  app.get('/api/:portal/auth/me', (_req, res) => res.json({ user: { ...res.locals.user, classrooms: userClassrooms(store, res.locals.user), isAdmin: !!store.db.prepare("SELECT 1 FROM admins WHERE user_id=?").get(res.locals.user.id) } }));
   app.post('/api/:portal/auth/logout', (req, res) => {
     const token = cookieToken(req, res.locals.role);
     store.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash(token));

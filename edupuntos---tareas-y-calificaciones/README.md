@@ -33,6 +33,8 @@ En el entorno de Codex, Bun está en `/workspace/cloud-tools/node_modules/.bin/b
 
 ## Cuentas
 
+El administrador puede crear profesores y alumnos desde la app docente. Sigue [ADMIN_ACCOUNTS.md](ADMIN_ACCOUNTS.md) para aplicar la migración 006 y activar la cuenta administrativa.
+
 Los alumnos pueden registrarse con nombres, apellidos, DNI y correo e iniciar sesión con DNI o correo. Consulta [cómo activar y comprobar las cuentas en Netlify + Supabase](STUDENT_ACCOUNTS.md). Las cuentas docentes se asignan administrativamente. No hay contraseñas predeterminadas. En modo local, un administrador también puede crear cuentas con estos comandos; cada uno solicita una contraseña de 12 a 128 caracteres sin mostrarla:
 
 ```sh

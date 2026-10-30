@@ -1,4 +1,5 @@
 declare module '#backend' {
+  export const createAccount: typeof import('./supabase-api').createAccount;
   export const currentUser: typeof import('./supabase-api').currentUser;
   export const login: typeof import('./supabase-api').login;
   export const register: typeof import('./supabase-api').register;

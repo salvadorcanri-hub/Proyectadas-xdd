@@ -92,6 +92,7 @@ export interface AppState {
 }
 
 export interface User {
+  isAdmin?: boolean;
   classrooms?: Classroom[];
   id: string;
   username: string;

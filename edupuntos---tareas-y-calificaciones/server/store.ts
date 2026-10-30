@@ -30,6 +30,7 @@ export class Store {
         student_id TEXT REFERENCES students(id), CHECK((role='student') = (student_id IS NOT NULL)));
       CREATE TABLE IF NOT EXISTS classrooms (id TEXT PRIMARY KEY, grade INTEGER NOT NULL CHECK(grade BETWEEN 1 AND 5), section TEXT NOT NULL CHECK(section IN ('A','B','C','D')), UNIQUE(grade,section));
       CREATE TABLE IF NOT EXISTS teacher_classrooms (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, classroom_id TEXT NOT NULL REFERENCES classrooms(id), PRIMARY KEY(user_id,classroom_id));
+      CREATE TABLE IF NOT EXISTS admins (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE);
       CREATE TABLE IF NOT EXISTS sessions (
         token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS student_accounts (
